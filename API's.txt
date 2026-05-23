@@ -1,0 +1,142 @@
+Available actions
+Name	Method	Path	
+getNuevosTiemposLast	get	/api/App/nuevostiempos/last	
+Test
+getNuevosTiemposHistorical	get	/api/App/nuevostiempos/historical	
+Test
+Privacy policy
+https://app.example.com/privacy
+
+
+
+
+openapi: 3.1.0
+info:
+  title: JPS Nuevos Tiempos API
+  version: 1.0.1
+servers:
+  - url: https://integration.jps.go.cr
+
+paths:
+  /api/App/nuevostiempos/last:
+    get:
+      operationId: getNuevosTiemposLast
+      summary: Último resultado de Nuevos Tiempos (incluye mañana, mediaTarde, tarde)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dia:
+                    type: string
+                    description: Fecha del día (ISO)
+                  manana:
+                    $ref: "#/components/schemas/NuevoTiemposSlot"
+                  mediaTarde:
+                    $ref: "#/components/schemas/NuevoTiemposSlot"
+                  tarde:
+                    $ref: "#/components/schemas/NuevoTiemposSlot"
+                additionalProperties: true
+
+  /api/App/nuevostiempos/historical:
+    get:
+      operationId: getNuevosTiemposHistorical
+      summary: Histórico de Nuevos Tiempos por rango de fechas
+      parameters:
+        - name: fechaInicio
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+          description: Fecha/hora de inicio (ISO 8601), ej. 2026-02-01T00:00:00
+        - name: fechaFin
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+          description: Fecha/hora fin (ISO 8601), ej. 2026-02-16T23:59:59
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Respuesta del histórico (puede variar; se deja flexible)
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NuevoTiemposHistoricalItem"
+                additionalProperties: true
+
+components:
+  schemas:
+    NuevoTiemposSlot:
+      type: object
+      properties:
+        hora:
+          type: integer
+        numero:
+          type: integer
+        meganNumero:
+          type: integer
+          description: Mega número (tal como viene en el API)
+        premio:
+          type: integer
+        in_reventado:
+          type: integer
+          description: 1 = Reventado, 0 = no
+        sorteo_Id:
+          type: integer
+        numeroSorteo:
+          type: integer
+        fecha:
+          type: string
+          format: date-time
+        estado:
+          type: integer
+        vigencia:
+          type: string
+          format: date-time
+        tipoSorteoCode:
+          type: string
+        tipoSorteoName:
+          type: string
+        porcentaje:
+          type: integer
+        colorBolita:
+          type: string
+        descripcionBolita:
+          type: string
+        imagenBolita:
+          nullable: true
+      additionalProperties: true
+
+    NuevoTiemposHistoricalItem:
+      type: object
+      description: Elemento del histórico (campos típicos; se deja flexible)
+      properties:
+        numero:
+          type: integer
+        meganNumero:
+          type: integer
+        in_reventado:
+          type: integer
+        fecha:
+          type: string
+          format: date-time
+        numeroSorteo:
+          type: integer
+      additionalProperties: true
+
+
+
+
+
+

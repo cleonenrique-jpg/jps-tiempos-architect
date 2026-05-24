@@ -334,6 +334,7 @@
     let LATEST = {};                    // última línea por id (source of truth)
     let HISTORY = null;                 // historical_data.json (para Section 3 winners)
     let WINNERS_INDEX = {};             // {dia-session: numero}
+    let SELECTION_STATE = {};           // {pred_id: Set<num>} — selección actual de números por predicción
 
     function rebuildLatest() {
       LATEST = {};

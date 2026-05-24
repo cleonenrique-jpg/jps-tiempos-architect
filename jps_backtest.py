@@ -181,6 +181,33 @@ def select_set_c(report, n=5): return _architect_sets(report, n)["C"]
 def select_set_d(report, n=5): return _architect_sets(report, n)["D"]
 
 
+def select_ensemble(report: dict, n: int = 5) -> List[int]:
+    """Ensemble por votos: candidatos de Architect top-10 + Sets A/B/C/D.
+
+    Cada número en cualquiera de esas listas suma un voto. Top-N por votos,
+    tiebreaker por combined_weight. Hipótesis: consenso entre estrategias
+    refleja una señal más robusta que cualquier individual.
+    """
+    candidates: List[int] = []
+    candidates.extend(select_architect(report, 10))
+    candidates.extend(select_set_a(report, 5))
+    candidates.extend(select_set_b(report, 5))
+    candidates.extend(select_set_c(report, 5))
+    candidates.extend(select_set_d(report, 5))
+    combined = report.get("combined_weights") or report.get("weights", {})
+
+    votes: Dict[int, int] = {}
+    for num in candidates:
+        votes[num] = votes.get(num, 0) + 1
+    if not votes:
+        return []
+    ranked = sorted(
+        votes.items(),
+        key=lambda x: (-x[1], -combined.get(str(x[0]).zfill(2), 0)),
+    )
+    return [num for num, _ in ranked[:n]]
+
+
 def select_exacto_mega_agree(report: dict, n: int = 5) -> List[int]:
     """Números que están en top-15 de exacto Y en top-15 de mega simultáneamente.
 
@@ -225,12 +252,17 @@ STRATEGIES = [
     ("freq_only",              select_freq_only,            "balanced"),
     ("cold_numbers",           select_cold,                 "balanced"),
     ("top_mega_only",          select_top_mega,             "balanced"),
-    # ── Tier 1 nuevas (todas con exacto_only profile salvo concentrated)
+    # ── Tier 1
     ("exacto_mega_agree",      select_exacto_mega_agree,    "exacto_only"),
     ("concentrated_top1",      None,                        "concentrated"),
     ("decay_recent",           None,                        "exacto_only"),
     ("session_specific",       None,                        "exacto_only"),
     ("signal_only_play",       None,                        "exacto_only"),
+    # ── Tier 2
+    ("multi_strategy_ensemble", select_ensemble,            "exacto_only"),
+    ("weekday_specific",       None,                        "exacto_only"),
+    ("proportional_weight",    select_architect,            "proportional"),
+    ("inverse_recent",         None,                        "exacto_only"),
     # ── Baseline (siempre al final para que sirva de referencia)
     ("random_uniform",         None,                        "balanced"),
 ]
@@ -333,6 +365,46 @@ def run_backtest(
                 else:
                     numbers = select_architect(report, n_tickets)
 
+            elif name == "weekday_specific":
+                # Análisis filtrado por día de la semana del target.
+                try:
+                    target_date = datetime.fromisoformat(target.get("dia", "").split("T")[0])
+                    target_wd = target_date.weekday()
+                except (ValueError, TypeError):
+                    continue
+                wd_draws = []
+                for d in subset:
+                    try:
+                        d_date = datetime.fromisoformat(d.get("dia", "").split("T")[0])
+                        if d_date.weekday() == target_wd:
+                            wd_draws.append(d)
+                    except (ValueError, TypeError):
+                        pass
+                if len(wd_draws) < 30:
+                    continue
+                report_wd = _silent_analyze(wd_draws)
+                if not report_wd:
+                    continue
+                numbers = select_architect(report_wd, n_tickets)
+
+            elif name == "inverse_recent":
+                # Anti-gambler's fallacy: números que NO salieron en últimos 30 sorteos,
+                # rankeados por combined_weight entre los disponibles.
+                recent_n = 30
+                recent_subset = subset[-recent_n:] if len(subset) > recent_n else subset
+                seen = set()
+                for d in recent_subset:
+                    try:
+                        seen.add(int(d.get("numero")))
+                    except (TypeError, ValueError):
+                        pass
+                missing = [n for n in range(100) if n not in seen]
+                if len(missing) < n_tickets:
+                    continue
+                combined = report.get("combined_weights") or report.get("weights", {})
+                missing.sort(key=lambda nn: -combined.get(str(nn).zfill(2), 0))
+                numbers = missing[:n_tickets]
+
             else:
                 try:
                     numbers = selector(report, n_tickets)
@@ -376,6 +448,27 @@ def run_backtest(
                         numbers, budget,
                         base_fixed=ticket_amount, rev_fixed=0,
                     )
+                elif profile == "proportional":
+                    # Bet sizing proporcional al peso del número (top-1 más, top-5 menos),
+                    # rev=0. Suma = budget, cada bet redondeada a ₡100, mínimo ₡100.
+                    combined_w = report.get("combined_weights") or report.get("weights", {})
+                    raw = [max(0.5, combined_w.get(str(nn).zfill(2), 1.0)) for nn in numbers]
+                    tot_w = sum(raw)
+                    bets = []
+                    used = 0
+                    for j, w in enumerate(raw[:-1]):
+                        amt = int(budget * w / tot_w / 100) * 100
+                        amt = max(100, amt)
+                        bets.append(amt)
+                        used += amt
+                    # Último: el resto, mínimo ₡100
+                    last_amt = max(100, ((budget - used) // 100) * 100)
+                    bets.append(last_amt)
+                    from jps_edge_tool import Ticket as _Ticket
+                    tickets = [
+                        _Ticket(num_exacto=nn, base=b, rev=0)
+                        for nn, b in zip(numbers, bets)
+                    ]
                 else:
                     rev_ratio = _profile_to_ratio(profile)
                     tickets, _rem = _build_tickets(numbers, budget, rev_ratio=rev_ratio)
@@ -585,15 +678,19 @@ def render_summary_md(report: dict) -> str:
     significant = [st for st in sorted_strats
                    if st['p_value_vs_baseline_permtest'] is not None
                    and st['p_value_vs_baseline_permtest'] < 0.05]
+    n_tested = sum(1 for st in sorted_strats if st['p_value_vs_baseline_permtest'] is not None)
+    expected_false_positives = round(0.05 * n_tested, 2)
+    bonferroni_threshold = 0.05 / max(1, n_tested)
     if significant:
         s.append("")
-        s.append("### Estrategias estadísticamente significativas (p < 0.05 en permutation test):")
+        s.append("### Estrategias estadísticamente significativas (p < 0.05 en permutation test crudo):")
         s.append("")
         for st in significant:
             direction = "mejor" if st["roi_total"] > base["roi_total"] else "peor"
-            s.append(f"- `{st['strategy']}` es **{direction}** que random (ROI {st['roi_total']*100:+.2f}% vs {base['roi_total']*100:+.2f}%, p={st['p_value_vs_baseline_permtest']:.3f})")
+            survives_bonf = "✓ pasa Bonferroni" if st['p_value_vs_baseline_permtest'] < bonferroni_threshold else "✗ NO pasa Bonferroni"
+            s.append(f"- `{st['strategy']}` es **{direction}** que random (ROI {st['roi_total']*100:+.2f}% vs {base['roi_total']*100:+.2f}%, p={st['p_value_vs_baseline_permtest']:.3f}) — {survives_bonf}")
         s.append("")
-        s.append("> **Cuidado con falsos positivos**: probamos 10 estrategias contra el mismo baseline. Con α=0.05 se esperan ~0.5 falsos positivos por puro multiple testing. Confirmar significancia con más data.")
+        s.append(f"> **Cuidado con multiple testing**: probamos {n_tested} estrategias contra el mismo baseline. Con α=0.05 se esperan **~{expected_false_positives} falsos positivos** por puro azar. El umbral Bonferroni-corregido es p<{bonferroni_threshold:.4f}. Si una estrategia pasa el crudo pero NO el corregido, hay que validarla con data nueva antes de creerle.")
     else:
         s.append("")
         s.append("### Veredicto: ninguna estrategia es significativamente distinta de random.")

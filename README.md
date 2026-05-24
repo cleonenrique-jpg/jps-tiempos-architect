@@ -27,7 +27,7 @@ What it is **not**: a predictor. EV is always negative. That is shown without so
 |---|---|
 | Number range | 00–99 (100 numbers) |
 | P(Exacto) | 1/100 = 1% |
-| Exacto payout | 90× base stake |
+| Exacto payout | 70× base stake |
 | Reventada | 1 of 3 balls → P = 1/3 |
 | Reventados payout | 200× rev stake (only if Exacto hits AND Reventada drawn) |
 | P(Exacto + Reventada) | 1/100 × 1/3 = 0.3333% |
@@ -35,11 +35,24 @@ What it is **not**: a predictor. EV is always negative. That is shown without so
 | Constraint | rev ≤ base always |
 | Daily draws | Mañana ~10:55 · Media tarde ~14:00 · Tarde ~18:00 |
 
-**EV formula per ticket:**
+**EV formula per ticket (Exacto + Reventados):**
 ```
-EV = (1/100) × [90 × base + (1/3) × 200 × rev] − (base + rev)
+EV = (1/100) × [70 × base + (1/3) × 200 × rev] − (base + rev)
 ```
-Example — base ₡200, rev ₡200: `EV = −₡66.67 / draw`. Setting `rev = 0` (Exacto-only) reduces house edge to ~10%, the most favorable play.
+Example — base ₡200, rev ₡200: `EV = −₡126.67 / draw`. Setting `rev = 0` (Exacto-only) reduces house edge to **-30%** (best Exacto play).
+
+JPS Tiempos offers 6 betting modalities — each is an independent bet (₡100 to ₡50,000):
+
+| Modality | Pays | Hit probability | EV per ₡100 stake | House edge |
+|---|---|---|---|---|
+| Exacto | 70× | 1/100 | -₡30 | 30% |
+| Reversible | 35× | 2/100 (palindrome: 1/100) | -₡30 | 30% |
+| Primer número | 7× | 1/10 | -₡30 | 30% |
+| Terminación | 7× | 1/10 | -₡30 | 30% |
+| Reventados | 200× | 1/100 × 1/3 = 1/300 | -₡33.33 | 33% |
+| Mega Reventados | 10× to 4000× | varies (6 cases) | ~-₡44 | 44% |
+
+All modalities have negative EV by design. Lower-multiplier modalities (Primer, Terminación) trade variance for hit-rate at the same expected loss.
 
 ---
 

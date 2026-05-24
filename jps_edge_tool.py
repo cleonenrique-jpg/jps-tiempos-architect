@@ -37,8 +37,8 @@ from typing import List, Optional, Dict, Tuple
 # CONSTANTS
 # ─────────────────────────────────────────────
 BASE_URL     = "https://integration.jps.go.cr"
-EXACTO_MULT  = 90
-REV_MULT     = 200
+EXACTO_MULT  = 70   # Per reglas oficiales JPS Costa Rica
+REV_MULT     = 200  # Reventados (condicional a acertar Exacto + bola Reventada)
 P_EXACTO     = 1 / 100
 P_REV        = 1 / 3
 N_MONTE      = 20_000

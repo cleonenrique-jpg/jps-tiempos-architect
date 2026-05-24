@@ -43,28 +43,58 @@ from jps_backtest import (
     select_set_d,
     select_freq_only,
     select_top_mega,
+    select_ensemble,
+    select_exacto_mega_agree,
 )
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE = "predictions_log.jsonl"
 VALID_SESSIONS = ("manana", "mediaTarde", "tarde")
-SESSION_HOUR = {"manana": 10, "mediaTarde": 14, "tarde": 18}
+# Horarios oficiales JPS: 12:55pm, 4:30pm, 7:30pm. SESSION_HOUR es el cutoff
+# después del cual la sesión "ya pasó" para efectos de calcular el próximo sorteo.
+SESSION_HOUR = {"manana": 13, "mediaTarde": 17, "tarde": 20}
 
+# Selectores simples (consumen el report ya calculado)
 STRATEGY_SELECTORS = {
-    "architect_balanced":     select_architect,
-    "architect_conservative": select_architect,
-    "architect_aggressive":   select_architect,
-    "set_a":                  select_set_a,
-    "set_b_freq_elite":       select_set_b,
-    "set_c_reverso_edge":     select_set_c,
-    "set_d_genie":            select_set_d,
-    "freq_only":              select_freq_only,
-    "top_mega_only":          select_top_mega,
+    "architect_balanced":      select_architect,
+    "architect_conservative":  select_architect,
+    "architect_aggressive":    select_architect,
+    "architect_exacto_only":   select_architect,
+    "set_a":                   select_set_a,
+    "set_b_freq_elite":        select_set_b,
+    "set_c_reverso_edge":      select_set_c,
+    "set_d_genie":             select_set_d,
+    "freq_only":               select_freq_only,
+    "top_mega_only":           select_top_mega,
+    "multi_strategy_ensemble": select_ensemble,
+    "exacto_mega_agree":       select_exacto_mega_agree,
 }
 
+# Estrategias que filtran el corpus antes de analizar (manejadas con special-case)
+DATA_FILTER_STRATEGIES = {
+    "weekday_specific",      # solo sorteos del mismo día de la semana
+    "session_specific",      # solo sorteos de la misma sesión
+    "decay_recent",          # últimos 100 sorteos
+    "inverse_recent",        # números que NO han salido en últimos 30
+    "signal_only_play",      # apuesta solo si top-1 z>2.5
+    "concentrated_top1",     # 1 ticket con todo el budget al top-1
+}
+
+ALL_STRATEGIES = list(STRATEGY_SELECTORS.keys()) + list(DATA_FILTER_STRATEGIES)
+
 STRATEGY_PROFILE_OVERRIDE = {
-    "architect_conservative": "conservative",
-    "architect_aggressive":   "aggressive",
+    "architect_conservative":  "conservative",
+    "architect_aggressive":    "aggressive",
+    "architect_exacto_only":   "exacto_only",
+    "concentrated_top1":       "concentrated",
+    # Estrategias nuevas usan exacto_only por defecto (mejor EV per colón)
+    "weekday_specific":        "exacto_only",
+    "session_specific":        "exacto_only",
+    "decay_recent":            "exacto_only",
+    "inverse_recent":          "exacto_only",
+    "signal_only_play":        "exacto_only",
+    "multi_strategy_ensemble": "exacto_only",
+    "exacto_mega_agree":       "exacto_only",
 }
 
 
@@ -115,19 +145,19 @@ def main():
                         help="Sesión del sorteo: manana | mediaTarde | tarde")
     parser.add_argument("--budget", type=int, default=5000, help="Budget total (₡)")
     parser.add_argument("--n", type=int, default=5, help="Número de tickets")
-    parser.add_argument("--strategy", default="architect_balanced",
-                        choices=list(STRATEGY_SELECTORS.keys()),
+    parser.add_argument("--strategy", default="architect_exacto_only",
+                        choices=ALL_STRATEGIES,
                         help="Estrategia de selección de números")
     parser.add_argument("--profile", default=None,
-                        choices=["conservative", "balanced", "aggressive"],
+                        choices=["conservative", "balanced", "aggressive", "exacto_only", "concentrated"],
                         help="Override del perfil de riesgo (default: derivado de la estrategia)")
     parser.add_argument("--force", action="store_true",
                         help="Permite registrar otra predicción para la misma sesión-fecha si ya existe una pending")
     args = parser.parse_args()
 
     # Determinar profile efectivo
-    profile = args.profile or STRATEGY_PROFILE_OVERRIDE.get(args.strategy, "balanced")
-    rev_ratio = _profile_to_ratio(profile)
+    profile = args.profile or STRATEGY_PROFILE_OVERRIDE.get(args.strategy, "exacto_only")
+    rev_ratio = _profile_to_ratio(profile) if profile in ("conservative", "balanced", "aggressive") else 0.0
 
     print("\n╔══════════════════════════════════════════════════════╗")
     print("║   JPS TIEMPOS LAB — PREDICT (pre-sorteo)             ║")
@@ -164,28 +194,120 @@ def main():
     # Análisis (lo silenciamos para no spammar)
     import contextlib
     import io
-    buf = io.StringIO()
-    with contextlib.redirect_stdout(buf):
-        class _A: pass
-        report = cmd_analyze(_A(), _draws=draws, _no_save=True)
+
+    def _silent_analyze(draws_subset):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            class _A: pass
+            return cmd_analyze(_A(), _draws=draws_subset, _no_save=True, _mc_iterations=1)
+
+    report = _silent_analyze(draws)
     if not report:
         print("\n  ERROR: análisis no produjo reporte.")
         sys.exit(1)
 
-    # Seleccionar números
-    selector = STRATEGY_SELECTORS[args.strategy]
-    try:
-        numbers = selector(report, args.n)
-    except Exception as e:
-        print(f"\n  ERROR: estrategia {args.strategy} falló: {e}")
-        sys.exit(1)
-    if not numbers or len(numbers) < args.n:
-        print(f"\n  ERROR: estrategia devolvió {len(numbers) if numbers else 0} números (esperados {args.n}).")
+    # ── Seleccionar números (varias rutas según estrategia)
+    skipped = False
+    if args.strategy in STRATEGY_SELECTORS:
+        selector = STRATEGY_SELECTORS[args.strategy]
+        try:
+            numbers = selector(report, args.n)
+        except Exception as e:
+            print(f"\n  ERROR: estrategia {args.strategy} falló: {e}")
+            sys.exit(1)
+
+    elif args.strategy == "weekday_specific":
+        target_date = datetime.fromisoformat(f"{draw_date}T00:00:00")
+        target_wd = target_date.weekday()
+        wd_draws = []
+        for d in draws:
+            try:
+                d_date = datetime.fromisoformat(d.get("dia", "").split("T")[0])
+                if d_date.weekday() == target_wd:
+                    wd_draws.append(d)
+            except (ValueError, TypeError):
+                pass
+        print(f"  Sub-corpus    : {len(wd_draws)} sorteos del mismo weekday ({target_date.strftime('%A')})")
+        if len(wd_draws) < 30:
+            print(f"\n  ERROR: solo {len(wd_draws)} sorteos para weekday {target_wd}. Mínimo 30.")
+            sys.exit(1)
+        report_wd = _silent_analyze(wd_draws)
+        numbers = select_architect(report_wd, args.n)
+
+    elif args.strategy == "session_specific":
+        sess_draws = [d for d in draws if d.get("session") == args.session]
+        print(f"  Sub-corpus    : {len(sess_draws)} sorteos de la misma sesión ({args.session})")
+        if len(sess_draws) < 30:
+            print(f"\n  ERROR: solo {len(sess_draws)} sorteos para sesión {args.session}. Mínimo 30.")
+            sys.exit(1)
+        report_sess = _silent_analyze(sess_draws)
+        numbers = select_architect(report_sess, args.n)
+
+    elif args.strategy == "decay_recent":
+        recent = draws[-100:] if len(draws) > 100 else draws
+        print(f"  Sub-corpus    : últimos {len(recent)} sorteos (step-decay)")
+        report_recent = _silent_analyze(recent)
+        numbers = select_architect(report_recent, args.n)
+
+    elif args.strategy == "inverse_recent":
+        recent_subset = draws[-30:] if len(draws) > 30 else draws
+        seen = set()
+        for d in recent_subset:
+            try:
+                seen.add(int(d.get("numero")))
+            except (TypeError, ValueError):
+                pass
+        missing = [nn for nn in range(100) if nn not in seen]
+        combined = report.get("combined_weights") or report.get("weights", {})
+        missing.sort(key=lambda nn: -combined.get(str(nn).zfill(2), 0))
+        numbers = missing[:args.n]
+        print(f"  Sub-corpus    : {len(missing)} números NO vistos en últimos 30")
+
+    elif args.strategy == "signal_only_play":
+        ranked = report.get("ranked_numbers", [])
+        if not ranked:
+            print("\n  ERROR: report no tiene ranked_numbers.")
+            sys.exit(1)
+        top1_z = abs(ranked[0].get("z_score", 0))
+        print(f"  Top-1 z-score : {top1_z:.2f}  (umbral: 2.5)")
+        if top1_z <= 2.5:
+            print(f"\n  ⚠ SEÑAL DÉBIL — la estrategia signal_only_play recomienda NO APOSTAR esta sesión.")
+            print(f"  No se registra predicción.\n")
+            sys.exit(0)
+        numbers = select_architect(report, args.n)
+
+    elif args.strategy == "concentrated_top1":
+        combined = report.get("combined_weights") or report.get("weights", {})
+        if not combined:
+            print("\n  ERROR: report sin weights.")
+            sys.exit(1)
+        top1 = max(combined.items(), key=lambda x: x[1])[0]
+        numbers = [int(top1)]
+
+    else:
+        print(f"\n  ERROR: estrategia {args.strategy} no soportada todavía en predict.")
         sys.exit(1)
 
-    # Construir tickets
+    # Validación (concentrated_top1 solo requiere 1; resto requieren args.n)
+    min_needed = 1 if args.strategy == "concentrated_top1" else args.n
+    if not numbers or len(numbers) < min_needed:
+        print(f"\n  ERROR: estrategia devolvió {len(numbers) if numbers else 0} números (esperados {min_needed}).")
+        sys.exit(1)
+
+    # ── Construir tickets según profile
     try:
-        tickets, remanente = _build_tickets(numbers, args.budget, rev_ratio=rev_ratio)
+        if profile == "concentrated":
+            ticket_amount = (args.budget // 100) * 100
+            tickets, remanente = _build_tickets(
+                numbers, args.budget, base_fixed=ticket_amount, rev_fixed=0,
+            )
+        elif profile == "exacto_only":
+            ticket_amount = (args.budget // args.n // 100) * 100
+            tickets, remanente = _build_tickets(
+                numbers, args.budget, base_fixed=ticket_amount, rev_fixed=0,
+            )
+        else:
+            tickets, remanente = _build_tickets(numbers, args.budget, rev_ratio=rev_ratio)
     except ValueError as e:
         print(f"\n  ERROR al construir tickets: {e}")
         sys.exit(1)

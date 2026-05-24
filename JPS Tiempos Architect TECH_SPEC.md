@@ -13,7 +13,7 @@
 |---|---|
 | Rango Exacto | 00–99 (100 números) |
 | P(Exacto) | 1/100 = 1% |
-| Pago Exacto | 90× la apuesta base |
+| Pago Exacto | 70× la apuesta base |
 | Reventada | 1 de 3 bolas → P = 1/3 |
 | Pago Reventados | 200× la apuesta rev (solo si Exacto acierta Y sale Reventada) |
 | P(Exacto + Reventada) | 1/100 × 1/3 = 0.3333% |
@@ -21,22 +21,56 @@
 | Incrementos | Múltiplos de ₡100 |
 | Restricción rev | rev ≤ base siempre |
 | meganNumero | Número Mega Reventados, 00–99, independiente del Exacto |
-| Sorteos diarios | Mañana (~10:55) · Media tarde (~14:00) · Tarde (~18:00) |
+| Sorteos diarios | Mañana (12:55pm) · Media tarde (4:30pm) · Tarde (7:30pm) |
 
 ### Fórmula EV por ticket
 
 ```
-EV = (1/100) × [90 × base + (1/3) × 200 × rev] − (base + rev)
+EV = (1/100) × [70 × base + (1/3) × 200 × rev] − (base + rev)
 ```
 
 **Ejemplo:** base=₡200, rev=₡200
 ```
-EV = 0.01 × [18,000 + 13,333] − 400 = 313.33 − 400 = −₡66.67/sorteo
+EV = 0.01 × [14,000 + 13,333] − 400 = 273.33 − 400 = −₡126.67/sorteo
 ```
 
 El EV es siempre negativo. Esto es correcto y se muestra sin suavizar.
 
-**Apuesta óptima**: con rev=0 (Exacto puro), el house edge baja a `−0.10 × base` → ROI = −10%. Es la jugada matemáticamente menos mala dado el pago 90× del Exacto y el pago 200× condicional del Reventados.
+**Apuesta óptima dentro de Exacto+Reventados**: con rev=0 (Exacto puro), el house edge es `−0.30 × base` → ROI = −30%. Es la jugada menos mala porque el Reventados tiene house edge 33% (peor por colón).
+
+### Modalidades completas (per reglas oficiales JPS)
+
+Cada modalidad es una jugada independiente. Inversión: ₡100 a ₡50,000 por jugada.
+
+| Modalidad | Pago | Prob | EV teórica por ₡100 |
+|---|---|---|---|
+| **Exacto** | 70× base | 1/100 | -₡30 |
+| **Reversible** | 35× | 2/100 (1/100 si palíndromo) | -₡30 |
+| **Primer número** | 7× | 1/10 | -₡30 |
+| **Terminación** | 7× | 1/10 | -₡30 |
+| **Reventados** | 200× rev | 1/100 × 1/3 = 1/300 (cond. Exacto + bola) | -₡33.33 |
+| **Mega Reventados** | 10× a 4000× | 6 casos (ver detalle abajo) | -₡43.7 |
+
+#### Detalle Mega Reventados (6 casos, cada uno con stake independiente Mega)
+
+| Caso | Exacto | Reventada | Mega | Pago Mega |
+|---|---|---|---|---|
+| 1 | ✓ acierta | ✓ sale | ✓ acierta | **4000×** + 70×Exacto + 200×Rev |
+| 2 | ✓ acierta | ✗ no sale | ✓ acierta | **1000×** + 70×Exacto |
+| 3 | ✓ acierta | ✓ sale | ✗ no acierta | **50×** + 70×Exacto + 200×Rev |
+| 4 | ✗ no acierta | ✓ sale | ✓ acierta | **20×** (solo Mega, sin Exacto) |
+| 5 | ✓ acierta | ✗ no sale | ✗ no acierta | **10×** + 70×Exacto |
+| 6 | ✗ no acierta | ✗ no sale | ✓ acierta | **10×** (solo Mega) |
+
+Probabilidades:
+- Caso 1: 1/100 × 1/3 × 1/100 = 1/30,000
+- Caso 2: 1/100 × 2/3 × 1/100 = 2/30,000
+- Caso 3: 1/100 × 1/3 × 99/100 = 99/30,000
+- Caso 4: 99/100 × 1/3 × 1/100 = 99/30,000
+- Caso 5: 1/100 × 2/3 × 99/100 = 198/30,000
+- Caso 6: 99/100 × 2/3 × 1/100 = 198/30,000
+
+EV Mega standalone por ₡1: `(4000+2000+4950+1980+1980+1980)/30000 = 0.563 → -₡43.7 / ₡100`.
 
 ---
 
@@ -334,7 +368,7 @@ for _ in range(n_simulaciones):
     recovered = 0
     for ticket in tickets:
         if ticket.num == drawn_num:
-            recovered += 90 × ticket.base
+            recovered += 70 × ticket.base
             if rev_hit:
                 recovered += 200 × ticket.rev
     net = recovered − total_staked
@@ -457,7 +491,7 @@ Tamaño: 5 tickets (primeros 5 del pool sin duplicados con A∪B∪C)
 
 ```
 hit_exacto = (num_apostado == resultado_exacto)
-exacto_win = base × 90   si hit_exacto, sino 0
+exacto_win = base × 70   si hit_exacto, sino 0
 rev_win    = rev × 200   si (hit_exacto AND reventada == SI), sino 0
 recuperado = exacto_win + rev_win
 neto       = recuperado − (base + rev)

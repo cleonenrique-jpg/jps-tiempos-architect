@@ -450,6 +450,21 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def send_file(self, abs_path, content_type):
+        """Sirve un archivo arbitrario del proyecto (HTML, CSS, PNG, etc.)."""
+        if not os.path.exists(abs_path):
+            self.send_json({"error": f"Not found: {os.path.basename(abs_path)}"}, 404)
+            return
+        with open(abs_path, "rb") as f:
+            body = f.read()
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        for k, v in CORS.items():
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_OPTIONS(self):
         self.send_response(200)
         for k, v in CORS.items():
@@ -461,7 +476,41 @@ class Handler(BaseHTTPRequestHandler):
         params = dict(urllib.parse.parse_qsl(parsed.query))
         try:
             if parsed.path == "/":
-                self.send_html(DASHBOARD_HTML)
+                # Nuevo dashboard editorial (Preset 2 Coreintel). El antiguo
+                # console_v2.html sigue en el repo para uso analítico avanzado
+                # pero el server sirve por default el nuevo.
+                dash_path = os.path.join(HERE, "dashboard.html")
+                if os.path.exists(dash_path):
+                    self.send_file(dash_path, "text/html; charset=utf-8")
+                else:
+                    self.send_html(DASHBOARD_HTML)  # fallback al embedded
+
+            elif parsed.path.startswith("/assets/"):
+                # Sirve assets de marca (CSS, logo). Path tipo /assets/brand/preset-editorial.css
+                rel = parsed.path.lstrip("/")
+                abs_path = os.path.join(HERE, rel)
+                # Validar que sigue dentro del HERE para evitar path traversal
+                if not os.path.abspath(abs_path).startswith(os.path.abspath(HERE)):
+                    self.send_json({"error": "forbidden"}, 403)
+                else:
+                    ct = "application/octet-stream"
+                    if rel.endswith(".css"): ct = "text/css; charset=utf-8"
+                    elif rel.endswith(".png"): ct = "image/png"
+                    elif rel.endswith(".svg"): ct = "image/svg+xml"
+                    elif rel.endswith(".js"): ct = "application/javascript"
+                    self.send_file(abs_path, ct)
+
+            elif parsed.path == "/predictions_log.jsonl":
+                # Sirve el JSONL para que dashboard.html lo lea con fetch()
+                p = os.path.join(HERE, "predictions_log.jsonl")
+                if os.path.exists(p):
+                    self.send_file(p, "application/x-ndjson; charset=utf-8")
+                else:
+                    self.send_file(p, "text/plain")  # 404 via send_file
+
+            elif parsed.path == "/backtest_report.json":
+                p = os.path.join(HERE, "backtest_report.json")
+                self.send_file(p, "application/json; charset=utf-8")
 
             elif parsed.path == "/api/status":
                 self.send_json({

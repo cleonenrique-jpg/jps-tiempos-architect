@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JPS Tiempos Lab · por Coreintelhub</title>
+  <link rel="stylesheet" href="assets/brand/preset-editorial.css" />
+  <link rel="icon" type="image/png" href="assets/brand/logo-principal.png" />
+  <style>
+    /* Layout local del dashboard (no parte del preset) */
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 22px; }
+    nav { height: 52px; display: flex; align-items: center; border-bottom: 1px solid var(--ci-hairline); position: sticky; top: 0; background: rgba(255,255,255,.8); backdrop-filter: blur(20px); z-index: 30; }
+    nav .nav-inner { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+    nav .brand { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+    nav .links { display: flex; gap: 28px; }
+    nav .links a { font-size: 13px; color: var(--ci-text-muted); text-decoration: none; cursor: pointer; }
+    nav .links a:hover { color: var(--ci-text); }
+    nav .links a.active { color: var(--ci-text); font-weight: 500; }
+
+    .hero { text-align: center; padding: 96px 0 40px; }
+    .eyebrow { font-size: 20px; font-weight: 600; color: var(--ci-core-500); letter-spacing: -0.01em; margin: 0 0 14px; }
+    .sub-w { max-width: 36ch; margin: 18px auto 0; }
+    .go { margin-top: 22px; }
+
+    .stats { display: flex; justify-content: center; gap: clamp(40px, 9vw, 100px); padding: 40px 0 80px; text-align: center; flex-wrap: wrap; }
+    .stat .cap { font-size: 14px; color: var(--ci-text-muted); margin-top: 12px; }
+
+    .section-label { text-align: center; margin: 56px 0 20px; }
+
+    .tiles-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .tile-inner { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 12px 0; }
+    .tile-inner .name { font-size: clamp(22px, 2.4vw, 28px); font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; margin: 12px 0 6px; }
+    .tile-inner .meta { font-size: 13px; color: var(--ci-text-muted); margin: 0; }
+    .tile-inner .nums { display: flex; gap: 10px; margin: 18px 0 8px; }
+    .tile-inner .nums span { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; border-radius: 12px; background: rgba(0,0,0,.06); font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+    .ci-tile--dark .tile-inner .nums span { background: rgba(255,255,255,.08); }
+
+    .ranking-tile { padding: 36px 32px; }
+    .ranking-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 14px; }
+    .ranking-row:last-child { border-bottom: 0; }
+    .ranking-row .lbl { display: flex; align-items: center; gap: 12px; }
+    .ranking-row .rank { width: 22px; color: #a1a1a6; font-variant-numeric: tabular-nums; }
+    .ranking-row .name { font-weight: 500; font-size: 14px; }
+    .ranking-row .roi { font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+    .ranking-row .pval { font-size: 12px; color: #a1a1a6; font-variant-numeric: tabular-nums; min-width: 70px; text-align: right; }
+    .ranking-row.sig .pval::after { content: " ★"; color: var(--ci-amarillo); }
+
+    .tiles-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .track-tile .name { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
+    .track-tile .ci-stat-num { margin: 16px 0 12px; }
+    .track-tile .meta { font-size: 13px; color: var(--ci-text-muted); }
+
+    footer { border-top: 1px solid var(--ci-hairline); margin-top: 96px; padding: 30px 0 56px; }
+    footer .fw { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--ci-text-muted); }
+
+    .empty-state { padding: 60px 0; text-align: center; color: var(--ci-text-muted); }
+
+    @media (max-width: 780px) {
+      .tiles-3 { grid-template-columns: 1fr; }
+      .tiles-2 { grid-template-columns: 1fr; }
+    }
+
+    /* Color palette para puntos de categoría — alternancia por slot */
+    .dot-core { background: var(--ci-core); }
+    .dot-naranja { background: var(--ci-naranja); }
+    .dot-cyan { background: var(--ci-cyan); }
+    .dot-lima { background: var(--ci-lima); }
+    .dot-amarillo { background: var(--ci-amarillo); }
+    .dot-intel { background: var(--ci-intel); }
+  </style>
+</head>
+<body class="ci-editorial">
+
+  <!-- 1 · Franja de marca multicolor (firma del Preset 2) -->
+  <div class="ci-brand-bar"></div>
+
+  <!-- Nav con co-branding -->
+  <nav>
+    <div class="wrap nav-inner">
+      <span class="brand">JPS Tiempos Lab <span class="ci-byline">por Coreintelhub</span></span>
+      <span class="links">
+        <a class="active" href="#predicciones">Predicciones</a>
+        <a href="#ranking">Estrategias</a>
+        <a href="#track">Track Record</a>
+      </span>
+    </div>
+  </nav>
+
+  <!-- Hero editorial -->
+  <header class="hero wrap">
+    <p class="eyebrow" id="hero-eyebrow">Estrategia campeón</p>
+    <h1 class="ci-h1" id="hero-headline">Cargando…</h1>
+    <p class="ci-sub sub-w" id="hero-sub">Inicializando dashboard.</p>
+    <p class="go"><a class="ci-link" href="#predicciones">Ver predicciones &rsaquo;</a></p>
+  </header>
+
+  <!-- Stat block — números en colores de marca como dato (no como texto) -->
+  <section class="stats wrap" id="hero-stats">
+    <div class="stat">
+      <div class="ci-stat-num" style="color:var(--ci-core)" id="stat-hits">—</div>
+      <div class="cap">hits sobre test</div>
+    </div>
+    <div class="stat">
+      <div class="ci-stat-num" style="color:var(--ci-naranja)" id="stat-roi">—</div>
+      <div class="cap">ROI backtest</div>
+    </div>
+    <div class="stat">
+      <div class="ci-stat-num" style="color:var(--ci-cyan)" id="stat-neto">—</div>
+      <div class="cap">neto acumulado</div>
+    </div>
+  </section>
+
+  <main class="wrap">
+
+    <!-- Predicciones del día -->
+    <section id="predicciones">
+      <p class="ci-kicker section-label">Categoría · Predicciones del día</p>
+      <div class="tiles-3" id="tiles-predicciones">
+        <div class="ci-tile">
+          <div class="tile-inner empty-state">Cargando predicciones…</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Ranking de estrategias (tile oscuro) -->
+    <section id="ranking">
+      <p class="ci-kicker section-label">Categoría · Ranking de estrategias</p>
+      <div class="ci-tile ci-tile--dark ranking-tile" id="ranking-tile">
+        <div class="empty-state" style="color:#a1a1a6">Cargando ranking…</div>
+      </div>
+    </section>
+
+    <!-- Track record (2 tiles) -->
+    <section id="track">
+      <p class="ci-kicker section-label">Categoría · Track record paper trading</p>
+      <div class="tiles-2" id="tiles-track">
+        <div class="ci-tile track-tile">
+          <p class="ci-kicker"><span class="ci-dot dot-core"></span>Pendientes</p>
+          <div class="ci-stat-num" id="track-pending" style="color:var(--ci-core)">—</div>
+          <p class="meta" id="track-pending-meta">Cargando…</p>
+        </div>
+        <div class="ci-tile track-tile">
+          <p class="ci-kicker"><span class="ci-dot dot-naranja"></span>Reconciliadas</p>
+          <div class="ci-stat-num" id="track-reconciled" style="color:var(--ci-naranja)">—</div>
+          <p class="meta" id="track-reconciled-meta">Cargando…</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer con lockup CoreIntel -->
+  <footer>
+    <div class="wrap fw">
+      <span class="ci-lockup">Powered by <img src="assets/brand/logo-principal.png" alt="CoreIntel — Coreintelhub" /></span>
+      <span id="footer-meta">JPS Tiempos · backtest 519 sorteos</span>
+    </div>
+  </footer>
+
+  <script>
+    // ============================================================
+    // Helpers
+    // ============================================================
+    const $ = (id) => document.getElementById(id);
+    const colors = ['dot-core', 'dot-naranja', 'dot-cyan', 'dot-lima', 'dot-amarillo', 'dot-intel'];
+    const fmtMoney = (n) => '₡' + Math.round(n).toLocaleString('es-CR');
+    const fmtPct = (n, signed = false) => (signed && n > 0 ? '+' : '') + (n * 100).toFixed(2) + '%';
+    const SESSION_LABEL = { manana: 'Mañana · 12:55pm', mediaTarde: 'Mediatarde · 4:30pm', tarde: 'Tarde · 7:30pm' };
+
+    async function fetchJSON(url) {
+      try {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(r.status);
+        return await r.json();
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function fetchJSONL(url) {
+      try {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(r.status);
+        const txt = await r.text();
+        return txt.split('\n').filter(l => l.trim()).map(l => JSON.parse(l));
+      } catch (e) {
+        return [];
+      }
+    }
+
+    // ============================================================
+    // Hero: estrategia campeón desde backtest_report.json
+    // ============================================================
+    async function renderHero() {
+      const report = await fetchJSON('backtest_report.json');
+      if (!report || !report.strategies) {
+        $('hero-headline').textContent = 'Sin backtest disponible';
+        $('hero-sub').textContent = 'Correr `python3 jps_backtest.py` para generar el reporte.';
+        return;
+      }
+      const sorted = Object.values(report.strategies).sort((a, b) => b.roi_total - a.roi_total);
+      const champ = sorted[0];
+      $('hero-eyebrow').textContent = 'Estrategia campeón · ' + champ.profile;
+      $('hero-headline').textContent = champ.strategy + ' — ROI ' + fmtPct(champ.roi_total, true);
+      const cfg = report.config;
+      const pvalNote = champ.p_value_vs_baseline_permtest != null
+        ? ' · p=' + champ.p_value_vs_baseline_permtest.toFixed(3)
+        : '';
+      $('hero-sub').textContent =
+        'Backtest sobre ' + cfg.n_total_draws + ' sorteos · hit rate '
+        + (champ.hit_rate * 100).toFixed(2) + '% vs 4.9% teórico' + pvalNote + '.';
+      $('stat-hits').textContent = champ.n_hits + '/' + champ.n_sessions;
+      $('stat-roi').textContent = fmtPct(champ.roi_total, true);
+      $('stat-neto').textContent = (champ.total_neto >= 0 ? '+' : '') + fmtMoney(champ.total_neto);
+      $('footer-meta').textContent = 'JPS Tiempos · backtest ' + cfg.n_total_draws + ' sorteos · ' + cfg.n_test + ' test · seed ' + cfg.rng_seed;
+    }
+
+    // ============================================================
+    // Predicciones del día
+    // ============================================================
+    async function renderPredicciones() {
+      const records = await fetchJSONL('predictions_log.jsonl');
+      const container = $('tiles-predicciones');
+
+      // Agrupar por id (última línea por id es source of truth)
+      const latest = {};
+      for (const r of records) latest[r.id] = r;
+      const today = new Date().toISOString().slice(0, 10);
+      // Predicciones para hoy y mañana, todas pending
+      const pending = Object.values(latest)
+        .filter(r => r.status === 'pending' && r.draw_date >= today)
+        .sort((a, b) => (a.draw_date + a.session).localeCompare(b.draw_date + b.session));
+
+      if (pending.length === 0) {
+        container.innerHTML = '<div class="ci-tile" style="grid-column:1/-1"><div class="tile-inner empty-state">Sin predicciones pendientes. Corre <code>python3 jps_predict.py --session manana</code></div></div>';
+        return;
+      }
+
+      container.innerHTML = '';
+      pending.slice(0, 3).forEach((rec, idx) => {
+        const tile = document.createElement('div');
+        const isDark = idx === 0;  // primera predicción destacada en tile oscuro
+        tile.className = 'ci-tile' + (isDark ? ' ci-tile--dark' : '');
+        const dotClass = colors[idx % colors.length];
+        const payout = Math.round(70 * (rec.budget / rec.n_tickets));  // 70× single ticket base
+        tile.innerHTML = `
+          <div class="tile-inner">
+            <p class="ci-kicker"><span class="ci-dot ${dotClass}"></span>${SESSION_LABEL[rec.session] || rec.session}</p>
+            <p class="meta">${rec.draw_date}</p>
+            <p class="name">${rec.strategy}</p>
+            <div class="nums">${rec.tickets.map(t => '<span>' + t.num + '</span>').join('')}</div>
+            <p class="meta">Budget ${fmtMoney(rec.budget)} · Payout si HIT ${fmtMoney(payout)}</p>
+          </div>
+        `;
+        container.appendChild(tile);
+      });
+    }
+
+    // ============================================================
+    // Ranking — top-5 estrategias por ROI
+    // ============================================================
+    async function renderRanking() {
+      const report = await fetchJSON('backtest_report.json');
+      const tile = $('ranking-tile');
+      if (!report || !report.strategies) {
+        tile.innerHTML = '<div class="empty-state" style="color:#a1a1a6">Sin backtest_report.json todavía.</div>';
+        return;
+      }
+      const sorted = Object.values(report.strategies).sort((a, b) => b.roi_total - a.roi_total).slice(0, 6);
+
+      const rows = sorted.map((st, i) => {
+        const dotClass = colors[i % colors.length];
+        const pval = st.p_value_vs_baseline_permtest;
+        const sig = (pval != null && pval < 0.05) ? 'sig' : '';
+        const pvalText = pval != null ? 'p=' + pval.toFixed(3) : 'baseline';
+        const roiText = fmtPct(st.roi_total, true);
+        const roiColor = st.roi_total >= 0 ? 'var(--ci-lima)' : '#ff7878';
+        return `
+          <div class="ranking-row ${sig}">
+            <div class="lbl">
+              <span class="rank">${i + 1}</span>
+              <span class="ci-dot ${dotClass}"></span>
+              <span class="name">${st.strategy}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:18px">
+              <span class="roi" style="color:${roiColor}">${roiText}</span>
+              <span class="pval">${pvalText}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+      tile.innerHTML = rows;
+    }
+
+    // ============================================================
+    // Track record
+    // ============================================================
+    async function renderTrack() {
+      const records = await fetchJSONL('predictions_log.jsonl');
+      const latest = {};
+      for (const r of records) latest[r.id] = r;
+      const pending = Object.values(latest).filter(r => r.status === 'pending');
+      const reconciled = Object.values(latest).filter(r => r.status === 'reconciled');
+
+      $('track-pending').textContent = pending.length;
+      if (pending.length > 0) {
+        const next = pending.sort((a, b) => a.draw_date.localeCompare(b.draw_date))[0];
+        $('track-pending-meta').textContent = 'Próximo: ' + next.draw_date + ' · ' + (SESSION_LABEL[next.session] || next.session);
+      } else {
+        $('track-pending-meta').textContent = 'Sin pendientes.';
+      }
+
+      $('track-reconciled').textContent = reconciled.length;
+      if (reconciled.length > 0) {
+        const hits = reconciled.filter(r => r.result && r.result.any_hit);
+        const last = reconciled.sort((a, b) => b.reconciled_at.localeCompare(a.reconciled_at))[0];
+        const lastHit = hits.length > 0 ? hits[hits.length - 1] : null;
+        if (lastHit) {
+          $('track-reconciled-meta').textContent =
+            hits.length + ' hits · última: ' + lastHit.draw_date + ' num ' + lastHit.result.drawn_exacto;
+        } else {
+          $('track-reconciled-meta').textContent = '0 hits aún · última: ' + last.draw_date;
+        }
+      } else {
+        $('track-reconciled-meta').textContent = 'Sin reconciliaciones aún.';
+      }
+    }
+
+    // ============================================================
+    // Boot
+    // ============================================================
+    (async function init() {
+      await Promise.all([
+        renderHero(),
+        renderPredicciones(),
+        renderRanking(),
+        renderTrack(),
+      ]);
+    })();
+  </script>
+</body>
+</html>

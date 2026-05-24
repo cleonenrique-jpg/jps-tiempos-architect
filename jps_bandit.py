@@ -238,6 +238,69 @@ def _merge_latest(records: List[dict]) -> Dict[str, dict]:
     return latest
 
 
+def bootstrap_from_backtest(state: BanditState, verbose: bool = True) -> dict:
+    """Alimenta el bandit con las observaciones de TODAS las estrategias del
+    backtester (counterfactual evaluation).
+
+    Lee backtest_sessions.json — que tiene per-strategy, per-session, hit/miss
+    info — y actualiza el bandit con cada observación. Esto evita el sesgo de
+    que el JSONL solo tiene predicciones de weekday_recent30 (porque solo esa
+    se "ejecutó" en el paper trading). Ahora todas las estrategias tienen
+    historia.
+
+    Reseta los contadores antes de bootstrappear.
+    Returns: {n_strategies_with_data, n_total_observations, n_total_hits}
+    """
+    # Reset
+    for name in state.data["strategies"]:
+        state.data["strategies"][name] = {
+            "alpha": 1, "beta": 1, "n_picks": 0, "n_observations": 0,
+            "last_hit_dia": None, "last_miss_dia": None,
+        }
+    state.data["history"] = []
+
+    sessions_path = os.path.join(HERE, "backtest_sessions.json")
+    if not os.path.exists(sessions_path):
+        if verbose:
+            print(f"  ⚠ No existe backtest_sessions.json — corré primero `python3 jps_backtest.py`")
+        return {"n_strategies_with_data": 0, "n_total_observations": 0, "n_total_hits": 0}
+
+    with open(sessions_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    by_strategy = data.get("sessions_by_strategy", {})
+    total_obs = 0
+    total_hits = 0
+    strategies_with_data = 0
+
+    for strat_name, sessions in by_strategy.items():
+        if strat_name not in state.data["strategies"]:
+            continue  # skip random_uniform u otras no candidatas
+        n_for_strat = 0
+        for sess in sessions:
+            if sess.get("skipped"):
+                continue
+            hit = bool(sess.get("hit", False))
+            state.update(strat_name, hit,
+                         dia=sess.get("dia", ""),
+                         session=sess.get("session", ""))
+            n_for_strat += 1
+            total_obs += 1
+            if hit:
+                total_hits += 1
+        if n_for_strat > 0:
+            strategies_with_data += 1
+
+    if verbose:
+        print(f"  Procesadas {total_obs} observaciones de {strategies_with_data} estrategias")
+        print(f"  Total hits: {total_hits}  ·  hit rate global: {total_hits/total_obs*100:.2f}%" if total_obs else "")
+    return {
+        "n_strategies_with_data": strategies_with_data,
+        "n_total_observations": total_obs,
+        "n_total_hits": total_hits,
+    }
+
+
 def bootstrap_from_history(state: BanditState, verbose: bool = True) -> int:
     """Replay todas las predicciones del JSONL contra los winners reales.
 
@@ -319,6 +382,23 @@ def cmd_bootstrap():
     cmd_status()
 
 
+def cmd_bootstrap_full():
+    """Bootstrap inteligente: usa backtest_sessions.json para alimentar
+    el bandit con observaciones de TODAS las estrategias (counterfactual)."""
+    state = BanditState.load()
+    print("\n  Bootstrap-full: usando backtest_sessions.json (counterfactual eval)")
+    print("  Esto alimenta el bandit con outcomes de TODAS las estrategias,")
+    print("  no solo de las que se 'jugaron' en el paper trading.")
+    print()
+    result = bootstrap_from_backtest(state, verbose=True)
+    if result["n_total_observations"] == 0:
+        print("  ⚠ Necesitás correr `python3 jps_backtest.py` primero.")
+        return
+    state.save()
+    print(f"  ✓ Guardado en {STATE_FILE}")
+    cmd_status()
+
+
 def cmd_pick():
     state = BanditState.load()
     rng = random.Random()
@@ -340,16 +420,19 @@ def cmd_reset():
 def main():
     parser = argparse.ArgumentParser(description="JPS Tiempos Lab — Adaptive Bandit")
     sub = parser.add_subparsers(dest="cmd")
-    sub.add_parser("status",    help="Ver posteriors actuales")
-    sub.add_parser("bootstrap", help="Inicializar desde JSONL + histórico")
-    sub.add_parser("pick",      help="Elegir estrategia para próximo sorteo")
-    sub.add_parser("reset",     help="Borrar estado")
+    sub.add_parser("status",         help="Ver posteriors actuales")
+    sub.add_parser("bootstrap",      help="Inicializar desde JSONL + histórico (solo estrategias usadas)")
+    sub.add_parser("bootstrap-full", help="Inicializar desde backtest_sessions.json (TODAS las estrategias, counterfactual)")
+    sub.add_parser("pick",           help="Elegir estrategia para próximo sorteo")
+    sub.add_parser("reset",          help="Borrar estado")
     args = parser.parse_args()
 
     if args.cmd == "status":
         cmd_status()
     elif args.cmd == "bootstrap":
         cmd_bootstrap()
+    elif args.cmd == "bootstrap-full":
+        cmd_bootstrap_full()
     elif args.cmd == "pick":
         cmd_pick()
     elif args.cmd == "reset":

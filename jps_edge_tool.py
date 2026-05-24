@@ -37,7 +37,7 @@ from typing import List, Optional, Dict, Tuple
 # CONSTANTS
 # ─────────────────────────────────────────────
 BASE_URL     = "https://integration.jps.go.cr"
-EXACTO_MULT  = 70
+EXACTO_MULT  = 90
 REV_MULT     = 200
 P_EXACTO     = 1 / 100
 P_REV        = 1 / 3

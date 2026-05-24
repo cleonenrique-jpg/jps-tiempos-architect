@@ -13,7 +13,7 @@
 |---|---|
 | Rango Exacto | 00–99 (100 números) |
 | P(Exacto) | 1/100 = 1% |
-| Pago Exacto | 70× la apuesta base |
+| Pago Exacto | 90× la apuesta base |
 | Reventada | 1 de 3 bolas → P = 1/3 |
 | Pago Reventados | 200× la apuesta rev (solo si Exacto acierta Y sale Reventada) |
 | P(Exacto + Reventada) | 1/100 × 1/3 = 0.3333% |
@@ -26,15 +26,17 @@
 ### Fórmula EV por ticket
 
 ```
-EV = (1/100) × [70 × base + (1/3) × 200 × rev] − (base + rev)
+EV = (1/100) × [90 × base + (1/3) × 200 × rev] − (base + rev)
 ```
 
 **Ejemplo:** base=₡200, rev=₡200
 ```
-EV = 0.01 × [14,000 + 13,333] − 400 = 273.33 − 400 = −₡126.67/sorteo
+EV = 0.01 × [18,000 + 13,333] − 400 = 313.33 − 400 = −₡66.67/sorteo
 ```
 
 El EV es siempre negativo. Esto es correcto y se muestra sin suavizar.
+
+**Apuesta óptima**: con rev=0 (Exacto puro), el house edge baja a `−0.10 × base` → ROI = −10%. Es la jugada matemáticamente menos mala dado el pago 90× del Exacto y el pago 200× condicional del Reventados.
 
 ---
 
@@ -332,7 +334,7 @@ for _ in range(n_simulaciones):
     recovered = 0
     for ticket in tickets:
         if ticket.num == drawn_num:
-            recovered += 70 × ticket.base
+            recovered += 90 × ticket.base
             if rev_hit:
                 recovered += 200 × ticket.rev
     net = recovered − total_staked
@@ -455,7 +457,7 @@ Tamaño: 5 tickets (primeros 5 del pool sin duplicados con A∪B∪C)
 
 ```
 hit_exacto = (num_apostado == resultado_exacto)
-exacto_win = base × 70   si hit_exacto, sino 0
+exacto_win = base × 90   si hit_exacto, sino 0
 rev_win    = rev × 200   si (hit_exacto AND reventada == SI), sino 0
 recuperado = exacto_win + rev_win
 neto       = recuperado − (base + rev)

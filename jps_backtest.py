@@ -182,7 +182,10 @@ def select_set_d(report, n=5): return _architect_sets(report, n)["D"]
 
 
 # Definición: (name, selector, profile). random_uniform es especial — usa rng del loop.
+# Profile "exacto_only" → rev=0 (apuesta Exacto puro, sin Reventados). Matemáticamente
+# óptima bajo pago 90× porque elimina la exposición a la apuesta Rev (que tiene EV peor).
 STRATEGIES = [
+    ("architect_exacto_only",  select_architect,    "exacto_only"),
     ("architect_balanced",     select_architect,    "balanced"),
     ("architect_conservative", select_architect,    "conservative"),
     ("architect_aggressive",   select_architect,    "aggressive"),
@@ -260,9 +263,17 @@ def run_backtest(
             if not numbers or len(numbers) < n_tickets:
                 continue
 
-            rev_ratio = _profile_to_ratio(profile)
             try:
-                tickets, _rem = _build_tickets(numbers, budget, rev_ratio=rev_ratio)
+                if profile == "exacto_only":
+                    # Apuesta Exacto pura: rev=0. Bajo pago 90×, minimiza house edge a -10%.
+                    ticket_amount = (budget // n_tickets // 100) * 100
+                    tickets, _rem = _build_tickets(
+                        numbers, budget,
+                        base_fixed=ticket_amount, rev_fixed=0,
+                    )
+                else:
+                    rev_ratio = _profile_to_ratio(profile)
+                    tickets, _rem = _build_tickets(numbers, budget, rev_ratio=rev_ratio)
             except ValueError:
                 continue
 
@@ -473,22 +484,28 @@ def render_summary_md(report: dict) -> str:
         s.append("Eso es lo esperado en una lotería honesta. **Confirma que el sistema está construido correctamente** — si alguna estrategia 'venciera' a random sobre este sample, sería sospechoso (bug o suerte).")
 
     s.append("")
-    s.append("## Comparativa de perfiles (Architect)")
+    s.append("## Comparativa de perfiles (Architect, mismos números top-5)")
     s.append("")
+    eo   = strats.get("architect_exacto_only")
     cons = strats.get("architect_conservative")
     bal  = strats.get("architect_balanced")
     agg  = strats.get("architect_aggressive")
     if cons and bal and agg:
         s.append(f"| Perfil | Mean/sess | Std | P95 | Max Drawdown |")
         s.append(f"|---|---:|---:|---:|---:|")
-        s.append(f"| conservative | ₡{cons['mean_net_per_session']:,.0f} | ₡{cons['std_net']:,.0f} | ₡{cons['p95_net']:,} | ₡{cons['max_drawdown_cumulative']:,} |")
-        s.append(f"| balanced     | ₡{bal['mean_net_per_session']:,.0f} | ₡{bal['std_net']:,.0f} | ₡{bal['p95_net']:,} | ₡{bal['max_drawdown_cumulative']:,} |")
-        s.append(f"| aggressive   | ₡{agg['mean_net_per_session']:,.0f} | ₡{agg['std_net']:,.0f} | ₡{agg['p95_net']:,} | ₡{agg['max_drawdown_cumulative']:,} |")
+        if eo:
+            s.append(f"| **exacto_only** (rev=0) | ₡{eo['mean_net_per_session']:,.0f} | ₡{eo['std_net']:,.0f} | ₡{eo['p95_net']:,} | ₡{eo['max_drawdown_cumulative']:,} |")
+        s.append(f"| conservative (rev=25%)  | ₡{cons['mean_net_per_session']:,.0f} | ₡{cons['std_net']:,.0f} | ₡{cons['p95_net']:,} | ₡{cons['max_drawdown_cumulative']:,} |")
+        s.append(f"| balanced (rev=45%)      | ₡{bal['mean_net_per_session']:,.0f} | ₡{bal['std_net']:,.0f} | ₡{bal['p95_net']:,} | ₡{bal['max_drawdown_cumulative']:,} |")
+        s.append(f"| aggressive (rev=65%)    | ₡{agg['mean_net_per_session']:,.0f} | ₡{agg['std_net']:,.0f} | ₡{agg['p95_net']:,} | ₡{agg['max_drawdown_cumulative']:,} |")
         s.append("")
         if cons['std_net'] < bal['std_net'] < agg['std_net']:
             s.append("Relación profile↔varianza es la **esperada**: más rev_ratio → más std sin afectar la media de forma significativa.")
         else:
             s.append("Relación profile↔varianza es **inesperada** — vale investigar `_build_tickets()` y la asignación rev/base por perfil.")
+        if eo:
+            s.append("")
+            s.append(f"**Exacto-only** debería tener la **mejor mean/sess** (menor pérdida esperada) bajo pago 90× porque elimina la apuesta Rev (que es 3.3× peor en EV/colón). Si no lidera la media, sospechá ruido del sample.")
 
     cold = strats.get("cold_numbers")
     if cold and base:

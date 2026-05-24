@@ -27,7 +27,7 @@ What it is **not**: a predictor. EV is always negative. That is shown without so
 |---|---|
 | Number range | 00–99 (100 numbers) |
 | P(Exacto) | 1/100 = 1% |
-| Exacto payout | 70× base stake |
+| Exacto payout | 90× base stake |
 | Reventada | 1 of 3 balls → P = 1/3 |
 | Reventados payout | 200× rev stake (only if Exacto hits AND Reventada drawn) |
 | P(Exacto + Reventada) | 1/100 × 1/3 = 0.3333% |
@@ -37,9 +37,9 @@ What it is **not**: a predictor. EV is always negative. That is shown without so
 
 **EV formula per ticket:**
 ```
-EV = (1/100) × [70 × base + (1/3) × 200 × rev] − (base + rev)
+EV = (1/100) × [90 × base + (1/3) × 200 × rev] − (base + rev)
 ```
-Example — base ₡200, rev ₡200: `EV = −₡126.67 / draw`
+Example — base ₡200, rev ₡200: `EV = −₡66.67 / draw`. Setting `rev = 0` (Exacto-only) reduces house edge to ~10%, the most favorable play.
 
 ---
 

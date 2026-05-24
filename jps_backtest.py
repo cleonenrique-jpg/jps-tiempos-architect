@@ -181,22 +181,58 @@ def select_set_c(report, n=5): return _architect_sets(report, n)["C"]
 def select_set_d(report, n=5): return _architect_sets(report, n)["D"]
 
 
-# Definición: (name, selector, profile). random_uniform es especial — usa rng del loop.
+def select_exacto_mega_agree(report: dict, n: int = 5) -> List[int]:
+    """Números que están en top-15 de exacto Y en top-15 de mega simultáneamente.
+
+    Hipótesis: dos señales independientes coincidiendo en un número ofrecen
+    más evidencia que una sola. Si la lista de intersección tiene <n, completa
+    con top exacto.
+    """
+    weights_e = report.get("weights", {})
+    weights_m = report.get("mega_weights", {})
+    if not weights_e or not weights_m:
+        return []
+    top_e = [k for k, _ in sorted(weights_e.items(), key=lambda x: -x[1])[:15]]
+    top_m = set(k for k, _ in sorted(weights_m.items(), key=lambda x: -x[1])[:15])
+    intersection = [k for k in top_e if k in top_m]
+    combined = report.get("combined_weights", weights_e)
+    intersection.sort(key=lambda k: -combined.get(k, 0))
+    # Pad con top exacto si faltan
+    if len(intersection) < n:
+        for k in top_e:
+            if k not in intersection:
+                intersection.append(k)
+                if len(intersection) >= n:
+                    break
+    return [int(k) for k in intersection[:n]]
+
+
+# Definición: (name, selector, profile). Algunas estrategias son "especiales" — su
+# nombre es la marca para que el loop principal aplique lógica distinta (random_uniform,
+# concentrated_top1, decay_recent, session_specific, signal_only_play).
 # Profile "exacto_only" → rev=0 (apuesta Exacto puro, sin Reventados). Matemáticamente
 # óptima bajo pago 90× porque elimina la exposición a la apuesta Rev (que tiene EV peor).
+# Profile "concentrated" → 1 solo ticket con todo el budget al top-1 number.
 STRATEGIES = [
-    ("architect_exacto_only",  select_architect,    "exacto_only"),
-    ("architect_balanced",     select_architect,    "balanced"),
-    ("architect_conservative", select_architect,    "conservative"),
-    ("architect_aggressive",   select_architect,    "aggressive"),
-    ("set_a",                  select_set_a,        "balanced"),
-    ("set_b_freq_elite",       select_set_b,        "balanced"),
-    ("set_c_reverso_edge",     select_set_c,        "balanced"),
-    ("set_d_genie",            select_set_d,        "balanced"),
-    ("freq_only",              select_freq_only,    "balanced"),
-    ("cold_numbers",           select_cold,         "balanced"),
-    ("top_mega_only",          select_top_mega,     "balanced"),
-    ("random_uniform",         None,                "balanced"),
+    ("architect_exacto_only",  select_architect,            "exacto_only"),
+    ("architect_balanced",     select_architect,            "balanced"),
+    ("architect_conservative", select_architect,            "conservative"),
+    ("architect_aggressive",   select_architect,            "aggressive"),
+    ("set_a",                  select_set_a,                "balanced"),
+    ("set_b_freq_elite",       select_set_b,                "balanced"),
+    ("set_c_reverso_edge",     select_set_c,                "balanced"),
+    ("set_d_genie",            select_set_d,                "balanced"),
+    ("freq_only",              select_freq_only,            "balanced"),
+    ("cold_numbers",           select_cold,                 "balanced"),
+    ("top_mega_only",          select_top_mega,             "balanced"),
+    # ── Tier 1 nuevas (todas con exacto_only profile salvo concentrated)
+    ("exacto_mega_agree",      select_exacto_mega_agree,    "exacto_only"),
+    ("concentrated_top1",      None,                        "concentrated"),
+    ("decay_recent",           None,                        "exacto_only"),
+    ("session_specific",       None,                        "exacto_only"),
+    ("signal_only_play",       None,                        "exacto_only"),
+    # ── Baseline (siempre al final para que sirva de referencia)
+    ("random_uniform",         None,                        "balanced"),
 ]
 
 
@@ -252,20 +288,89 @@ def run_backtest(
         target_dia = _parse_dia(target.get("dia", ""))
 
         for name, selector, profile in STRATEGIES:
+            skipped = False
+
+            # ─── Selección de números (varias rutas según estrategia) ───
             if name == "random_uniform":
                 numbers = rng.sample(range(100), n_tickets)
+
+            elif name == "concentrated_top1":
+                combined = report.get("combined_weights") or report.get("weights", {})
+                if not combined:
+                    continue
+                top1_key = max(combined.items(), key=lambda x: x[1])[0]
+                numbers = [int(top1_key)]  # 1 solo número
+
+            elif name == "decay_recent":
+                # Step-function decay: usar solo últimos 100 sorteos
+                recent_n = 100
+                recent_subset = subset[-recent_n:] if len(subset) > recent_n else subset
+                if len(recent_subset) < 30:
+                    continue
+                report_recent = _silent_analyze(recent_subset)
+                if not report_recent:
+                    continue
+                numbers = select_architect(report_recent, n_tickets)
+
+            elif name == "session_specific":
+                session_draws = [d for d in subset if d.get("session") == target_session]
+                if len(session_draws) < 30:
+                    continue
+                report_session = _silent_analyze(session_draws)
+                if not report_session:
+                    continue
+                numbers = select_architect(report_session, n_tickets)
+
+            elif name == "signal_only_play":
+                # Apostar solo cuando el top-1 z-score > 2.5; saltar si uniforme.
+                ranked = report.get("ranked_numbers", [])
+                if not ranked:
+                    continue
+                top1_z = abs(ranked[0].get("z_score", 0))
+                if top1_z <= 2.5:
+                    skipped = True
+                    numbers = []
+                else:
+                    numbers = select_architect(report, n_tickets)
+
             else:
                 try:
                     numbers = selector(report, n_tickets)
                 except Exception:
                     continue
 
-            if not numbers or len(numbers) < n_tickets:
+            # ─── Caso skip (signal_only_play sin señal) ───
+            if skipped:
+                strategy_sessions[name].append({
+                    "dia": target_dia,
+                    "session": target_session,
+                    "drawn_exacto": target_num,
+                    "drawn_reventada": target_rev,
+                    "numbers_chosen": [],
+                    "total_cost": 0,
+                    "total_neto": 0,
+                    "roi": 0,
+                    "hit": False,
+                    "skipped": True,
+                })
                 continue
 
+            # ─── Validación de selección ───
+            min_needed = 1 if name == "concentrated_top1" else n_tickets
+            if not numbers or len(numbers) < min_needed:
+                continue
+
+            # ─── Construcción de tickets ───
             try:
-                if profile == "exacto_only":
-                    # Apuesta Exacto pura: rev=0. Bajo pago 90×, minimiza house edge a -10%.
+                if profile == "concentrated":
+                    # 1 ticket con todo el budget al top-1, rev=0
+                    ticket_amount = (budget // 100) * 100
+                    tickets, _rem = _build_tickets(
+                        numbers, budget,
+                        base_fixed=ticket_amount, rev_fixed=0,
+                    )
+                elif profile == "exacto_only":
+                    # Exacto puro: rev=0. Bajo pago 90×, house edge a -10%.
                     ticket_amount = (budget // n_tickets // 100) * 100
                     tickets, _rem = _build_tickets(
                         numbers, budget,
@@ -298,6 +403,7 @@ def run_backtest(
                 "total_neto": total_neto,
                 "roi": roi,
                 "hit": any_hit,
+                "skipped": False,
             })
 
         if verbose and (i % 20 == 0 or i == len(test)):
@@ -312,13 +418,21 @@ def run_backtest(
         sessions = strategy_sessions[name]
         if not sessions:
             continue
+        # n_sess incluye sesiones saltadas; n_played solo las jugadas.
+        # Para la mayoría de estrategias son iguales; signal_only_play los separa.
+        played = [s for s in sessions if not s.get("skipped")]
+        n_sess = len(sessions)
+        n_played = len(played)
+        play_rate = n_played / n_sess if n_sess else 0
+
         nets = [s["total_neto"] for s in sessions]
         costs = [s["total_cost"] for s in sessions]
-        n_sess = len(sessions)
         hits = sum(1 for s in sessions if s["hit"])
         total_apostado = sum(costs)
         total_neto = sum(nets)
         roi_total = total_neto / total_apostado if total_apostado else 0
+        # Mean/std calculadas sobre TODAS las sesiones (incluyendo skipped=0). Eso
+        # refleja honestamente el resultado por sesión disponible, no por sesión jugada.
         mean_net = sum(nets) / n_sess
         var = sum((x - mean_net) ** 2 for x in nets) / max(1, n_sess - 1)
         std = math.sqrt(var)
@@ -377,6 +491,8 @@ def run_backtest(
             "strategy": name,
             "profile": strategy_profile[name],
             "n_sessions": n_sess,
+            "n_played": n_played,
+            "play_rate": round(play_rate, 4),
             "n_hits": hits,
             "hit_rate": round(hits / n_sess, 6),
             "total_apostado": total_apostado,
@@ -446,8 +562,9 @@ def render_summary_md(report: dict) -> str:
     for st in sorted_strats:
         z = f"{st['z_vs_baseline']:+.2f}" if st["z_vs_baseline"] is not None else "—"
         p = f"{st['p_value_vs_baseline_permtest']:.3f}" if st["p_value_vs_baseline_permtest"] is not None else "baseline"
+        play_note = f" ({st['play_rate']*100:.0f}% played)" if st.get('play_rate', 1.0) < 1.0 else ""
         s.append(
-            f"| `{st['strategy']}` | "
+            f"| `{st['strategy']}`{play_note} | "
             f"{st['hit_rate']*100:.2f}% | "
             f"{st['roi_total']*100:+.2f}% | "
             f"₡{st['mean_net_per_session']:,.0f} | "

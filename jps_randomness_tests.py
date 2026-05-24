@@ -286,6 +286,83 @@ def spectral_analysis(seq: List[int], top_k: int = 5) -> dict:
 
 
 # ════════════════════════════════════════════════════════════════════
+# TEST 7B — Compression test (information-theoretic, [arxiv:cs/0504006])
+# ════════════════════════════════════════════════════════════════════
+
+def compression_test(seq: List[int], n_baseline: int = 200) -> dict:
+    """Test info-teórico: si la secuencia es comprimible, NO es aleatoria.
+
+    Comprime con 3 algoritmos (zlib/bz2/lzma) y compara con baseline empírico
+    generado a partir de secuencias IID uniformes del mismo largo. Si nuestro
+    ratio es significativamente menor (z<-2) → hay estructura compresible.
+    """
+    import zlib, bz2, lzma
+    import random as _r
+
+    # Pasar secuencia a bytes (números 0-99 caben en 1 byte cada uno)
+    data = bytes(seq)
+    n = len(data)
+    if n < 100:
+        return {"name": "Compression test", "error": "n<100"}
+
+    def _ratios(d: bytes) -> dict:
+        return {
+            "zlib": len(zlib.compress(d, 9)) / len(d),
+            "bz2":  len(bz2.compress(d, 9))  / len(d),
+            "lzma": len(lzma.compress(d, preset=9)) / len(d),
+        }
+
+    observed = _ratios(data)
+
+    # Baseline empírico — generar N secuencias uniformes y medir ratio
+    rng = _r.Random(42)
+    baselines = {"zlib": [], "bz2": [], "lzma": []}
+    for _ in range(n_baseline):
+        rand_seq = bytes(rng.randint(0, 99) for _ in range(n))
+        for k, v in _ratios(rand_seq).items():
+            baselines[k].append(v)
+
+    def _stats(lst):
+        m = sum(lst) / len(lst)
+        var = sum((x-m)**2 for x in lst) / max(1, len(lst)-1)
+        return m, math.sqrt(var)
+
+    rejected_any = False
+    per_algo = {}
+    for k in ("zlib", "bz2", "lzma"):
+        mean, std = _stats(baselines[k])
+        obs = observed[k]
+        z = (obs - mean) / std if std > 0 else 0
+        # P-value two-tailed (obs muy bajo → comprime más → patrón)
+        p = 2 * normal_sf(abs(z))
+        rej = p < 0.05 and z < 0   # solo rechazamos si comprime MÁS que esperado
+        if rej:
+            rejected_any = True
+        per_algo[k] = {
+            "observed_ratio": round(obs, 5),
+            "baseline_mean": round(mean, 5),
+            "baseline_std": round(std, 5),
+            "z_score": round(z, 4),
+            "p_value": round(p, 6),
+            "rejected": rej,
+        }
+
+    return {
+        "name": "Compression test (zlib/bz2/lzma)",
+        "n_samples": n,
+        "n_baseline_runs": n_baseline,
+        "per_algorithm": per_algo,
+        "p_value": min(a["p_value"] for a in per_algo.values()),
+        "interpretation": (
+            "secuencia comprime MÁS que random → hay estructura"
+            if rejected_any else
+            "comprime igual que random → sin estructura compresible"
+        ),
+        "p_threshold": 0.05,
+    }
+
+
+# ════════════════════════════════════════════════════════════════════
 # TEST 7 — Run-length analysis
 # ════════════════════════════════════════════════════════════════════
 
@@ -354,6 +431,7 @@ def main():
     results.append(per_lag_acf(seq, max_lag=30))
     results.append(spectral_analysis(seq))
     results.append(run_length_analysis(seq))
+    results.append(compression_test(seq))
 
     print(f"\n  ──────────────────────────────────────────────────────────────────")
     print(f"  {'TEST':<35} {'STAT':>12} {'P-VALUE':>10}  RESULT")

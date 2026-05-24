@@ -340,6 +340,13 @@
     // CONSTANTES
     // ════════════════════════════════════════════════════════════
     const EXACTO_MULT = 70;
+    // Confidence Gate: el botón "Confirmar apuesta" solo se habilita si la
+    // estrategia elegida supera el baseline teórico (4.9%) con 95% de confianza
+    // (lower bound del intervalo Beta). Si no, el sistema te previene de apostar
+    // sin evidencia suficiente. Ajustá CONFIDENCE_BASELINE si querés más/menos
+    // estricto.
+    const CONFIDENCE_BASELINE = 0.049;   // 4.9% = teórico uniforme 1 - (99/100)^5
+    const CONFIDENCE_Z = 1.96;            // 1.96 = 95% confianza; 2.58 = 99%
     const SESSION_LABEL = {
       manana:     { label: 'Mañana · 12:55pm',     hour: 13, color: 'dot-core' },
       mediaTarde: { label: 'Mediatarde · 4:30pm', hour: 17, color: 'dot-naranja' },

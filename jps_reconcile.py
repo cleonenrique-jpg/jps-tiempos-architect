@@ -236,6 +236,23 @@ def main():
             for rec in newly_reconciled:
                 f.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
         print(f"\n  ✓ Apendeadas {len(newly_reconciled)} líneas a {LOG_FILE}")
+
+        # ── Actualizar bandit con outcomes recién reconciliados (Phase 9)
+        try:
+            from jps_bandit import BanditState
+            bandit = BanditState.load()
+            for rec in newly_reconciled:
+                strategy = rec.get("strategy")
+                if not strategy:
+                    continue
+                hit = rec.get("result", {}).get("any_hit", False)
+                bandit.update(strategy, bool(hit),
+                              dia=rec.get("draw_date", ""),
+                              session=rec.get("session", ""))
+            bandit.save()
+            print(f"  ✓ Bandit actualizado con {len(newly_reconciled)} outcomes")
+        except Exception as e:
+            print(f"  ⚠ No se pudo actualizar el bandit: {e}")
     elif args.dry_run and newly_reconciled:
         print(f"\n  --dry-run: se habrían apendeado {len(newly_reconciled)} líneas.")
 

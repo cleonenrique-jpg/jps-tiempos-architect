@@ -81,7 +81,7 @@ DATA_FILTER_STRATEGIES = {
     "concentrated_top1",     # 1 ticket con todo el budget al top-1
 }
 
-ALL_STRATEGIES = list(STRATEGY_SELECTORS.keys()) + list(DATA_FILTER_STRATEGIES)
+ALL_STRATEGIES = list(STRATEGY_SELECTORS.keys()) + list(DATA_FILTER_STRATEGIES) + ["adaptive"]
 
 STRATEGY_PROFILE_OVERRIDE = {
     "architect_conservative":  "conservative",
@@ -157,15 +157,32 @@ def main():
                         help="Permite registrar otra predicción para la misma sesión-fecha si ya existe una pending")
     args = parser.parse_args()
 
+    # Strategy "adaptive" → delega al bandit
+    effective_strategy = args.strategy
+    bandit_pick = None
+    if args.strategy == "adaptive":
+        try:
+            from jps_bandit import BanditState
+            state = BanditState.load()
+            effective_strategy = state.pick()
+            state.save()
+            bandit_pick = effective_strategy
+            print(f"\n  🧠 Bandit (Thompson sampling) eligió: {effective_strategy}")
+        except Exception as e:
+            print(f"\n  ⚠ Bandit no disponible ({e}). Fallback a architect_exacto_only.")
+            effective_strategy = "architect_exacto_only"
+
     # Determinar profile efectivo
-    profile = args.profile or STRATEGY_PROFILE_OVERRIDE.get(args.strategy, "exacto_only")
+    profile = args.profile or STRATEGY_PROFILE_OVERRIDE.get(effective_strategy, "exacto_only")
     rev_ratio = _profile_to_ratio(profile) if profile in ("conservative", "balanced", "aggressive") else 0.0
 
     print("\n╔══════════════════════════════════════════════════════╗")
     print("║   JPS TIEMPOS LAB — PREDICT (pre-sorteo)             ║")
     print("╚══════════════════════════════════════════════════════╝")
     print(f"  Sesión        : {args.session}")
-    print(f"  Estrategia    : {args.strategy}  (profile={profile}, rev_ratio={rev_ratio:.0%})")
+    strat_display = effective_strategy if args.strategy == "adaptive" else effective_strategy
+    suffix = "  (vía bandit adaptive)" if bandit_pick else ""
+    print(f"  Estrategia    : {strat_display}{suffix}  (profile={profile}, rev_ratio={rev_ratio:.0%})")
     print(f"  Budget        : ₡{args.budget:,}  ·  Tickets: {args.n}")
 
     # Cargar histórico y verificar frescura
@@ -210,15 +227,15 @@ def main():
 
     # ── Seleccionar números (varias rutas según estrategia)
     skipped = False
-    if args.strategy in STRATEGY_SELECTORS:
-        selector = STRATEGY_SELECTORS[args.strategy]
+    if effective_strategy in STRATEGY_SELECTORS:
+        selector = STRATEGY_SELECTORS[effective_strategy]
         try:
             numbers = selector(report, args.n)
         except Exception as e:
-            print(f"\n  ERROR: estrategia {args.strategy} falló: {e}")
+            print(f"\n  ERROR: estrategia {effective_strategy} falló: {e}")
             sys.exit(1)
 
-    elif args.strategy in ("weekday_specific", "weekday_recent30"):
+    elif effective_strategy in ("weekday_specific", "weekday_recent30"):
         target_date = datetime.fromisoformat(f"{draw_date}T00:00:00")
         target_wd = target_date.weekday()
         wd_draws = []
@@ -232,7 +249,7 @@ def main():
         if len(wd_draws) < 30:
             print(f"\n  ERROR: solo {len(wd_draws)} sorteos para weekday {target_wd}. Mínimo 30.")
             sys.exit(1)
-        if args.strategy == "weekday_recent30":
+        if effective_strategy == "weekday_recent30":
             wd_draws = wd_draws[-30:]
             print(f"  Sub-corpus    : últimos 30 sorteos de {target_date.strftime('%A')} (campeón multi-window)")
         else:
@@ -240,7 +257,7 @@ def main():
         report_wd = _silent_analyze(wd_draws)
         numbers = select_architect(report_wd, args.n)
 
-    elif args.strategy == "session_specific":
+    elif effective_strategy == "session_specific":
         sess_draws = [d for d in draws if d.get("session") == args.session]
         print(f"  Sub-corpus    : {len(sess_draws)} sorteos de la misma sesión ({args.session})")
         if len(sess_draws) < 30:
@@ -249,13 +266,13 @@ def main():
         report_sess = _silent_analyze(sess_draws)
         numbers = select_architect(report_sess, args.n)
 
-    elif args.strategy == "decay_recent":
+    elif effective_strategy == "decay_recent":
         recent = draws[-100:] if len(draws) > 100 else draws
         print(f"  Sub-corpus    : últimos {len(recent)} sorteos (step-decay)")
         report_recent = _silent_analyze(recent)
         numbers = select_architect(report_recent, args.n)
 
-    elif args.strategy == "inverse_recent":
+    elif effective_strategy == "inverse_recent":
         recent_subset = draws[-30:] if len(draws) > 30 else draws
         seen = set()
         for d in recent_subset:
@@ -269,7 +286,7 @@ def main():
         numbers = missing[:args.n]
         print(f"  Sub-corpus    : {len(missing)} números NO vistos en últimos 30")
 
-    elif args.strategy == "signal_only_play":
+    elif effective_strategy == "signal_only_play":
         ranked = report.get("ranked_numbers", [])
         if not ranked:
             print("\n  ERROR: report no tiene ranked_numbers.")
@@ -282,7 +299,7 @@ def main():
             sys.exit(0)
         numbers = select_architect(report, args.n)
 
-    elif args.strategy == "concentrated_top1":
+    elif effective_strategy == "concentrated_top1":
         combined = report.get("combined_weights") or report.get("weights", {})
         if not combined:
             print("\n  ERROR: report sin weights.")
@@ -291,11 +308,11 @@ def main():
         numbers = [int(top1)]
 
     else:
-        print(f"\n  ERROR: estrategia {args.strategy} no soportada todavía en predict.")
+        print(f"\n  ERROR: estrategia {effective_strategy} no soportada todavía en predict.")
         sys.exit(1)
 
     # Validación (concentrated_top1 solo requiere 1; resto requieren args.n)
-    min_needed = 1 if args.strategy == "concentrated_top1" else args.n
+    min_needed = 1 if effective_strategy == "concentrated_top1" else args.n
     if not numbers or len(numbers) < min_needed:
         print(f"\n  ERROR: estrategia devolvió {len(numbers) if numbers else 0} números (esperados {min_needed}).")
         sys.exit(1)
@@ -338,7 +355,9 @@ def main():
         "predicted_at": datetime.now(timezone.utc).isoformat(),
         "draw_date": draw_date,
         "session": args.session,
-        "strategy": args.strategy,
+        "strategy": effective_strategy,
+        "strategy_requested": args.strategy,
+        "bandit_pick": bandit_pick,
         "profile": profile,
         "budget": args.budget,
         "n_tickets": args.n,

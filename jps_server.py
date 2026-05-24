@@ -566,6 +566,10 @@ class Handler(BaseHTTPRequestHandler):
                 p = os.path.join(HERE, "historical_data.json")
                 self.send_file(p, "application/json; charset=utf-8")
 
+            elif parsed.path == "/bandit_state.json":
+                p = os.path.join(HERE, "bandit_state.json")
+                self.send_file(p, "application/json; charset=utf-8")
+
             elif parsed.path == "/api/status":
                 self.send_json({
                     "draws":   len(STATE["draws"]),

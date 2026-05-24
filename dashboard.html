@@ -18,6 +18,19 @@
     nav.topnav .links a:hover { color: var(--ci-text); }
     nav.topnav .links a.active { color: var(--ci-text); font-weight: 500; }
 
+    /* ── SECCIÓN 4 — Bandit ── */
+    .bandit-summary { display: flex; justify-content: center; gap: clamp(40px, 9vw, 100px); padding: 12px 0 36px; text-align: center; flex-wrap: wrap; }
+    .bandit-tile { padding: 28px 32px; }
+    .bandit-leader-name { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
+    .bandit-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .bandit-table th, .bandit-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,.08); }
+    .bandit-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #a1a1a6; font-weight: 600; }
+    .bandit-table .num { font-variant-numeric: tabular-nums; }
+    .bandit-bar { display: inline-block; height: 8px; background: var(--ci-core); border-radius: 4px; vertical-align: middle; }
+    .bandit-bar-bg { display: inline-block; width: 80px; height: 8px; background: rgba(255,255,255,.1); border-radius: 4px; vertical-align: middle; margin-right: 8px; position: relative; overflow: hidden; }
+    .bandit-bar-bg .bandit-bar { position: absolute; left: 0; top: 0; }
+    .bandit-unexplored { opacity: 0.4; }
+
     .section-header { text-align: center; margin: 72px 0 28px; }
     .section-num { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ci-text-muted); margin-bottom: 12px; }
     .section-title { font-size: clamp(28px, 4vw, 40px); font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; margin: 0; }
@@ -145,6 +158,7 @@
         <a class="active" href="#sec-ganancias">Ganancias</a>
         <a href="#sec-predicciones">Predicciones</a>
         <a href="#sec-efectividad">Efectividad</a>
+        <a href="#sec-bandit">El cerebro</a>
       </span>
     </div>
   </nav>
@@ -258,6 +272,56 @@
 
       <div class="ci-tile ci-tile--dark month-tile" id="month-tile">
         <div class="empty-state" style="color:#a1a1a6">Cargando agregados del mes…</div>
+      </div>
+    </section>
+
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SECCIÓN 4 · EL CEREBRO ADAPTATIVO                          -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section id="sec-bandit">
+      <div class="section-header">
+        <p class="section-num">Sección 04</p>
+        <h2 class="section-title">El cerebro adaptativo</h2>
+        <p class="section-sub">Multi-armed bandit con Thompson Sampling · aprende cuál estrategia rinde mejor</p>
+      </div>
+
+      <div class="bandit-summary">
+        <div class="stat">
+          <div class="ci-stat-num" style="color:var(--ci-core)" id="bandit-leader">—</div>
+          <div class="cap">Líder por posterior mean</div>
+        </div>
+        <div class="stat">
+          <div class="ci-stat-num" style="color:var(--ci-naranja)" id="bandit-leader-rate">—</div>
+          <div class="cap">Hit rate estimado</div>
+        </div>
+        <div class="stat">
+          <div class="ci-stat-num" style="color:var(--ci-cyan)" id="bandit-total-obs">—</div>
+          <div class="cap">Total observaciones</div>
+        </div>
+      </div>
+
+      <div class="ci-tile ci-tile--dark bandit-tile">
+        <p class="ci-kicker" style="margin-bottom:18px;text-align:center">Posterior de cada estrategia · Beta(α, β)</p>
+        <table class="bandit-table" id="bandit-table">
+          <thead>
+            <tr>
+              <th>Estrategia</th>
+              <th class="num">α</th>
+              <th class="num">β</th>
+              <th class="num">Obs</th>
+              <th>Posterior (hit rate)</th>
+              <th class="num">Std</th>
+              <th class="num">Picks</th>
+            </tr>
+          </thead>
+          <tbody id="bandit-tbody">
+            <tr><td colspan="7" class="empty-state" style="color:#a1a1a6">Cargando bandit_state.json…</td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:12px;color:#a1a1a6;margin:18px 0 0;text-align:center">
+          Las estrategias sin observaciones (α=β=1) tienen prior uniforme 50% — el bandit las explora hasta tener evidencia.
+        </p>
       </div>
     </section>
 
@@ -740,6 +804,72 @@
     }
 
     // ════════════════════════════════════════════════════════════
+    // SECCIÓN 4 — Bandit
+    // ════════════════════════════════════════════════════════════
+    async function renderBandit() {
+      const state = await fetchJSON('bandit_state.json');
+      const tbody = $('bandit-tbody');
+      if (!state || !state.strategies) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state" style="color:#a1a1a6">Sin bandit_state.json todavía. Corre <code>python3 jps_bandit.py bootstrap</code></td></tr>';
+        $('bandit-leader').textContent = '—';
+        $('bandit-leader-rate').textContent = '—';
+        $('bandit-total-obs').textContent = '0';
+        return;
+      }
+
+      // Compute summary rows (mismo orden que el CLI: observed first, by mean desc)
+      const rows = Object.entries(state.strategies).map(([name, s]) => {
+        const a = s.alpha, b = s.beta;
+        const mean = a / (a + b);
+        const std = Math.sqrt((a*b) / ((a+b)**2 * (a+b+1)));
+        return {
+          name, alpha: a, beta: b,
+          hits: a - 1, misses: b - 1,
+          n_obs: s.n_observations || 0,
+          n_picks: s.n_picks || 0,
+          mean, std,
+        };
+      });
+      rows.sort((x, y) => {
+        if ((x.n_obs > 0) !== (y.n_obs > 0)) return (y.n_obs > 0) - (x.n_obs > 0);
+        if (x.n_obs !== y.n_obs) return y.n_obs - x.n_obs;
+        return y.mean - x.mean;
+      });
+
+      const observed = rows.filter(r => r.n_obs > 0);
+      const leader = observed[0] || rows[0];
+      $('bandit-leader').textContent = leader.name;
+      $('bandit-leader-rate').textContent = (leader.mean * 100).toFixed(2) + '%';
+      $('bandit-total-obs').textContent = rows.reduce((s, r) => s + r.n_obs, 0);
+
+      // Render table — first observed, then a divider, then unexplored
+      let html = '';
+      rows.forEach(r => {
+        const isObs = r.n_obs > 0;
+        const meanPct = (r.mean * 100).toFixed(2);
+        const stdPct = (r.std * 100).toFixed(2);
+        const barW = Math.max(2, Math.min(80, r.mean * 80 * 5));  // escalado: 20% mean = 100% bar
+        const rowCls = isObs ? '' : 'bandit-unexplored';
+        const leaderMark = (r === leader && isObs) ? ' 🏆' : '';
+        html += `
+          <tr class="${rowCls}">
+            <td style="color:#fff">${r.name}${leaderMark}</td>
+            <td class="num">${r.alpha}</td>
+            <td class="num">${r.beta}</td>
+            <td class="num">${r.n_obs}</td>
+            <td>
+              <span class="bandit-bar-bg"><span class="bandit-bar" style="width:${barW}px"></span></span>
+              <span style="color:#fff">${meanPct}%</span>
+            </td>
+            <td class="num" style="color:#a1a1a6">±${stdPct}%</td>
+            <td class="num">${r.n_picks}</td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    // ════════════════════════════════════════════════════════════
     // RELOAD ALL — fetch + rebuild + render
     // ════════════════════════════════════════════════════════════
     async function reloadAll() {
@@ -752,6 +882,7 @@
       renderGanancias();
       renderPredicciones();
       renderEfectividad();
+      renderBandit();
     }
 
     reloadAll();

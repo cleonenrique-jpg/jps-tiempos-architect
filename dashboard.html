@@ -8,335 +8,752 @@
   <link rel="icon" type="image/png" href="assets/brand/logo-principal.png" />
   <style>
     /* Layout local del dashboard (no parte del preset) */
-    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 22px; }
-    nav { height: 52px; display: flex; align-items: center; border-bottom: 1px solid var(--ci-hairline); position: sticky; top: 0; background: rgba(255,255,255,.8); backdrop-filter: blur(20px); z-index: 30; }
-    nav .nav-inner { display: flex; align-items: center; justify-content: space-between; width: 100%; }
-    nav .brand { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
-    nav .links { display: flex; gap: 28px; }
-    nav .links a { font-size: 13px; color: var(--ci-text-muted); text-decoration: none; cursor: pointer; }
-    nav .links a:hover { color: var(--ci-text); }
-    nav .links a.active { color: var(--ci-text); font-weight: 500; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 0 22px; }
 
-    .hero { text-align: center; padding: 96px 0 40px; }
-    .eyebrow { font-size: 20px; font-weight: 600; color: var(--ci-core-500); letter-spacing: -0.01em; margin: 0 0 14px; }
-    .sub-w { max-width: 36ch; margin: 18px auto 0; }
-    .go { margin-top: 22px; }
+    nav.topnav { height: 54px; display: flex; align-items: center; border-bottom: 1px solid var(--ci-hairline); position: sticky; top: 0; background: rgba(255,255,255,.85); backdrop-filter: blur(20px); z-index: 30; }
+    nav.topnav .nav-inner { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+    nav.topnav .brand { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+    nav.topnav .links { display: flex; gap: 28px; }
+    nav.topnav .links a { font-size: 13px; color: var(--ci-text-muted); text-decoration: none; cursor: pointer; }
+    nav.topnav .links a:hover { color: var(--ci-text); }
+    nav.topnav .links a.active { color: var(--ci-text); font-weight: 500; }
 
-    .stats { display: flex; justify-content: center; gap: clamp(40px, 9vw, 100px); padding: 40px 0 80px; text-align: center; flex-wrap: wrap; }
-    .stat .cap { font-size: 14px; color: var(--ci-text-muted); margin-top: 12px; }
+    .section-header { text-align: center; margin: 72px 0 28px; }
+    .section-num { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ci-text-muted); margin-bottom: 12px; }
+    .section-title { font-size: clamp(28px, 4vw, 40px); font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; margin: 0; }
+    .section-sub { font-size: 16px; color: var(--ci-text-muted); margin: 10px 0 0; }
 
-    .section-label { text-align: center; margin: 56px 0 20px; }
+    /* ── SECCIÓN 1 — Ganancias ── */
+    .neto-display { text-align: center; padding: 28px 0 12px; }
+    .neto-display .neto-num { font-size: clamp(56px, 8vw, 96px); font-weight: 600; letter-spacing: -0.04em; line-height: 1; }
+    .neto-display .neto-num.positive { color: #2d8a2d; }
+    .neto-display .neto-num.negative { color: #c0392b; }
+    .neto-display .neto-num.zero { color: var(--ci-text-muted); }
+    .neto-display .neto-label { font-size: 14px; color: var(--ci-text-muted); margin-top: 8px; letter-spacing: 0.05em; text-transform: uppercase; }
 
-    .tiles-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-    .tile-inner { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 12px 0; }
-    .tile-inner .name { font-size: clamp(22px, 2.4vw, 28px); font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; margin: 12px 0 6px; }
-    .tile-inner .meta { font-size: 13px; color: var(--ci-text-muted); margin: 0; }
-    .tile-inner .nums { display: flex; gap: 10px; margin: 18px 0 8px; }
-    .tile-inner .nums span { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; border-radius: 12px; background: rgba(0,0,0,.06); font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
-    .ci-tile--dark .tile-inner .nums span { background: rgba(255,255,255,.08); }
+    .stats3 { display: flex; justify-content: center; gap: clamp(36px, 8vw, 100px); padding: 36px 0 24px; text-align: center; flex-wrap: wrap; }
+    .stats3 .stat { min-width: 140px; }
+    .stats3 .cap { font-size: 13px; color: var(--ci-text-muted); margin-top: 10px; }
 
-    .ranking-tile { padding: 36px 32px; }
-    .ranking-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 14px; }
-    .ranking-row:last-child { border-bottom: 0; }
-    .ranking-row .lbl { display: flex; align-items: center; gap: 12px; }
-    .ranking-row .rank { width: 22px; color: #a1a1a6; font-variant-numeric: tabular-nums; }
-    .ranking-row .name { font-weight: 500; font-size: 14px; }
-    .ranking-row .roi { font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-    .ranking-row .pval { font-size: 12px; color: #a1a1a6; font-variant-numeric: tabular-nums; min-width: 70px; text-align: right; }
-    .ranking-row.sig .pval::after { content: " ★"; color: var(--ci-amarillo); }
+    .sparkline-tile { margin: 20px auto 0; padding: 32px 28px; }
+    .sparkline-tile .ci-kicker { margin-bottom: 18px; text-align: center; }
+    .sparkline-tile svg { width: 100%; height: 100px; display: block; }
+    .sparkline-tile .xlabels { display: flex; justify-content: space-between; font-size: 11px; color: var(--ci-text-muted); margin-top: 8px; }
 
-    .tiles-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-    .track-tile .name { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
-    .track-tile .ci-stat-num { margin: 16px 0 12px; }
-    .track-tile .meta { font-size: 13px; color: var(--ci-text-muted); }
+    /* ── SECCIÓN 2 — Predicciones ── */
+    .strategy-banner { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 6px 0 28px; font-size: 14px; color: var(--ci-text-muted); }
+    .strategy-banner .strat-name { font-weight: 600; color: var(--ci-text); letter-spacing: -0.01em; }
 
-    footer { border-top: 1px solid var(--ci-hairline); margin-top: 96px; padding: 30px 0 56px; }
+    .pred-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .pred-card { padding: 30px 32px; }
+    .pred-card .pred-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+    .pred-card .pred-session { font-size: 15px; font-weight: 600; display: flex; align-items: center; }
+    .pred-card .countdown { font-size: 12px; color: var(--ci-text-muted); }
+    .pred-card.committed .countdown { color: #2d8a2d; font-weight: 600; }
+    .pred-card.skipped { opacity: 0.55; }
+    .pred-card.skipped .countdown { color: var(--ci-text-muted); }
+
+    .pred-numbers { display: flex; gap: 10px; margin: 16px 0 12px; flex-wrap: wrap; }
+    .pred-numbers .num-chip {
+      display: inline-flex; width: 56px; height: 56px;
+      align-items: center; justify-content: center;
+      border-radius: 14px;
+      background: var(--ci-core);
+      color: #fff;
+      font-size: 20px; font-weight: 700; letter-spacing: -0.02em;
+      cursor: pointer; user-select: none;
+      border: 2px solid var(--ci-core);
+      position: relative;
+      transition: all .15s ease;
+    }
+    .pred-numbers .num-chip:hover { transform: translateY(-2px); }
+    .pred-numbers .num-chip.unselected {
+      background: transparent;
+      color: var(--ci-text-muted);
+      border-color: var(--ci-hairline);
+    }
+    .pred-numbers .num-chip.unselected:hover { color: var(--ci-text); border-color: var(--ci-text-muted); }
+    .pred-numbers .num-chip.locked { cursor: default; }
+    .pred-numbers .num-chip.locked:hover { transform: none; }
+    .pred-numbers .num-chip.committed { background: #2d8a2d; border-color: #2d8a2d; }
+    .num-hint { font-size: 12px; color: var(--ci-text-muted); margin-bottom: 14px; }
+    .num-hint .count-strong { font-weight: 700; color: var(--ci-text); }
+
+    .bet-row { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
+    .bet-row label { font-size: 13px; color: var(--ci-text-muted); }
+    .bet-input { display: inline-flex; align-items: center; padding: 8px 14px; border: 1px solid var(--ci-hairline); border-radius: 12px; background: #fff; font-size: 15px; font-weight: 600; font-family: var(--ci-font); color: var(--ci-text); width: 130px; }
+    .bet-input input { border: 0; outline: 0; width: 100%; font-size: 15px; font-weight: 600; font-family: inherit; color: inherit; }
+    .bet-input .prefix { color: var(--ci-text-muted); margin-right: 6px; font-weight: 500; }
+    .pred-calc { font-size: 13px; color: var(--ci-text-muted); }
+    .pred-calc strong { color: var(--ci-text); font-weight: 600; }
+
+    .pred-actions { display: flex; gap: 10px; margin-top: 18px; }
+    .btn-confirm { background: var(--ci-core); color: #fff; border: 0; border-radius: 999px; padding: 10px 22px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; font-family: inherit; }
+    .btn-confirm:hover { background: var(--ci-core-500); }
+    .btn-skip { background: transparent; color: var(--ci-text-muted); border: 1px solid var(--ci-hairline); border-radius: 999px; padding: 9px 18px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s; font-family: inherit; }
+    .btn-skip:hover { background: rgba(0,0,0,.04); color: var(--ci-text); }
+    .pred-status-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 5px 12px; border-radius: 999px; font-weight: 600; }
+    .pred-status-tag.committed { background: rgba(45, 138, 45, 0.12); color: #2d8a2d; }
+    .pred-status-tag.skipped { background: rgba(0,0,0,.06); color: var(--ci-text-muted); }
+
+    /* ── SECCIÓN 3 — Efectividad ── */
+    .eff-stats { display: flex; justify-content: center; gap: clamp(36px, 9vw, 100px); padding: 14px 0 36px; text-align: center; flex-wrap: wrap; }
+
+    .eff-tile { padding: 28px 28px; }
+    .eff-tile .ci-kicker { margin-bottom: 18px; text-align: center; }
+    .eff-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .eff-table th, .eff-table td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--ci-hairline); vertical-align: top; }
+    .eff-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ci-text-muted); font-weight: 600; }
+    .eff-table .cell-pred { color: var(--ci-text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .eff-table .cell-winner { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+    .eff-table .cell-state { font-size: 12px; font-weight: 600; }
+    .eff-table .cell-state.hit { color: #2d8a2d; }
+    .eff-table .cell-state.miss { color: #c0392b; }
+    .eff-table .cell-state.skip { color: var(--ci-text-muted); }
+    .eff-table .cell-state.pend { color: var(--ci-text-muted); }
+    .eff-table tr.today { background: rgba(65, 170, 253, 0.04); }
+
+    .month-tile { margin-top: 20px; padding: 28px 32px; }
+    .month-tile .month-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
+    .month-tile .month-row.title { font-size: 16px; font-weight: 600; padding-top: 0; border-bottom: 1px solid rgba(255,255,255,.1); margin-bottom: 8px; }
+
+    footer { border-top: 1px solid var(--ci-hairline); margin-top: 100px; padding: 30px 0 56px; }
     footer .fw { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--ci-text-muted); }
 
-    .empty-state { padding: 60px 0; text-align: center; color: var(--ci-text-muted); }
+    .empty-state { padding: 40px 0; text-align: center; color: var(--ci-text-muted); font-size: 14px; }
 
-    @media (max-width: 780px) {
-      .tiles-3 { grid-template-columns: 1fr; }
-      .tiles-2 { grid-template-columns: 1fr; }
-    }
-
-    /* Color palette para puntos de categoría — alternancia por slot */
     .dot-core { background: var(--ci-core); }
     .dot-naranja { background: var(--ci-naranja); }
     .dot-cyan { background: var(--ci-cyan); }
     .dot-lima { background: var(--ci-lima); }
     .dot-amarillo { background: var(--ci-amarillo); }
     .dot-intel { background: var(--ci-intel); }
+
+    @media (max-width: 780px) {
+      .stats3 { gap: 28px; }
+    }
   </style>
 </head>
 <body class="ci-editorial">
 
-  <!-- 1 · Franja de marca multicolor (firma del Preset 2) -->
   <div class="ci-brand-bar"></div>
 
-  <!-- Nav con co-branding -->
-  <nav>
+  <nav class="topnav">
     <div class="wrap nav-inner">
       <span class="brand">JPS Tiempos Lab <span class="ci-byline">por Coreintelhub</span></span>
       <span class="links">
-        <a class="active" href="#predicciones">Predicciones</a>
-        <a href="#ranking">Estrategias</a>
-        <a href="#track">Track Record</a>
+        <a class="active" href="#sec-ganancias">Ganancias</a>
+        <a href="#sec-predicciones">Predicciones</a>
+        <a href="#sec-efectividad">Efectividad</a>
       </span>
     </div>
   </nav>
 
-  <!-- Hero editorial -->
-  <header class="hero wrap">
-    <p class="eyebrow" id="hero-eyebrow">Estrategia campeón</p>
-    <h1 class="ci-h1" id="hero-headline">Cargando…</h1>
-    <p class="ci-sub sub-w" id="hero-sub">Inicializando dashboard.</p>
-    <p class="go"><a class="ci-link" href="#predicciones">Ver predicciones &rsaquo;</a></p>
-  </header>
-
-  <!-- Stat block — números en colores de marca como dato (no como texto) -->
-  <section class="stats wrap" id="hero-stats">
-    <div class="stat">
-      <div class="ci-stat-num" style="color:var(--ci-core)" id="stat-hits">—</div>
-      <div class="cap">hits sobre test</div>
-    </div>
-    <div class="stat">
-      <div class="ci-stat-num" style="color:var(--ci-naranja)" id="stat-roi">—</div>
-      <div class="cap">ROI backtest</div>
-    </div>
-    <div class="stat">
-      <div class="ci-stat-num" style="color:var(--ci-cyan)" id="stat-neto">—</div>
-      <div class="cap">neto acumulado</div>
-    </div>
-  </section>
-
   <main class="wrap">
 
-    <!-- Predicciones del día -->
-    <section id="predicciones">
-      <p class="ci-kicker section-label">Categoría · Predicciones del día</p>
-      <div class="tiles-3" id="tiles-predicciones">
-        <div class="ci-tile">
-          <div class="tile-inner empty-state">Cargando predicciones…</div>
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SECCIÓN 1 · CUÁNTO HE GANADO                              -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section id="sec-ganancias">
+      <div class="section-header">
+        <p class="section-num">Sección 01</p>
+        <h2 class="section-title">Cuánto he ganado</h2>
+        <p class="section-sub">Performance acumulada de las apuestas confirmadas</p>
+      </div>
+
+      <div class="neto-display">
+        <div class="neto-num zero" id="neto-num">₡0</div>
+        <div class="neto-label">Neto acumulado</div>
+      </div>
+
+      <div class="stats3">
+        <div class="stat">
+          <div class="ci-stat-num" style="color:var(--ci-naranja)" id="stat-invertido">₡0</div>
+          <div class="cap">Invertido</div>
+        </div>
+        <div class="stat">
+          <div class="ci-stat-num" style="color:var(--ci-cyan)" id="stat-recuperado">₡0</div>
+          <div class="cap">Recuperado</div>
+        </div>
+        <div class="stat">
+          <div class="ci-stat-num" style="color:var(--ci-lima)" id="stat-roi">—</div>
+          <div class="cap">ROI</div>
+        </div>
+      </div>
+
+      <div class="ci-tile sparkline-tile">
+        <p class="ci-kicker">Evolución del neto en el tiempo</p>
+        <svg id="sparkline" viewBox="0 0 700 100" preserveAspectRatio="none"></svg>
+        <div class="xlabels" id="spark-labels"><span>—</span><span>hoy</span></div>
+      </div>
+    </section>
+
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SECCIÓN 2 · PREDICCIONES DEL DÍA                          -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section id="sec-predicciones">
+      <div class="section-header">
+        <p class="section-num">Sección 02</p>
+        <h2 class="section-title">Predicciones del día</h2>
+        <p class="section-sub">Ajustá la apuesta por número y confirmá la que quieras jugar</p>
+      </div>
+
+      <div class="strategy-banner">
+        <span>Estrategia</span>
+        <span class="strat-name" id="strat-name">weekday_recent30</span>
+        <span>·</span>
+        <span id="strat-context">Sunday · últimos 30 sorteos del mismo weekday</span>
+      </div>
+
+      <div class="pred-grid" id="pred-grid">
+        <div class="ci-tile pred-card">
+          <div class="empty-state">Cargando predicciones…</div>
         </div>
       </div>
     </section>
 
-    <!-- Ranking de estrategias (tile oscuro) -->
-    <section id="ranking">
-      <p class="ci-kicker section-label">Categoría · Ranking de estrategias</p>
-      <div class="ci-tile ci-tile--dark ranking-tile" id="ranking-tile">
-        <div class="empty-state" style="color:#a1a1a6">Cargando ranking…</div>
-      </div>
-    </section>
 
-    <!-- Track record (2 tiles) -->
-    <section id="track">
-      <p class="ci-kicker section-label">Categoría · Track record paper trading</p>
-      <div class="tiles-2" id="tiles-track">
-        <div class="ci-tile track-tile">
-          <p class="ci-kicker"><span class="ci-dot dot-core"></span>Pendientes</p>
-          <div class="ci-stat-num" id="track-pending" style="color:var(--ci-core)">—</div>
-          <p class="meta" id="track-pending-meta">Cargando…</p>
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SECCIÓN 3 · EFECTIVIDAD DE LA INFERENCIA                  -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section id="sec-efectividad">
+      <div class="section-header">
+        <p class="section-num">Sección 03</p>
+        <h2 class="section-title">Efectividad de la inferencia</h2>
+        <p class="section-sub">Qué tan seguido lo predicho cae junto al número ganador</p>
+      </div>
+
+      <div class="eff-stats">
+        <div class="stat">
+          <div class="ci-stat-num" style="color:var(--ci-core)" id="eff-today">—</div>
+          <div class="cap">Efectividad HOY</div>
         </div>
-        <div class="ci-tile track-tile">
-          <p class="ci-kicker"><span class="ci-dot dot-naranja"></span>Reconciliadas</p>
-          <div class="ci-stat-num" id="track-reconciled" style="color:var(--ci-naranja)">—</div>
-          <p class="meta" id="track-reconciled-meta">Cargando…</p>
+        <div class="stat">
+          <div class="ci-stat-num" style="color:var(--ci-naranja)" id="eff-month">—</div>
+          <div class="cap">Acumulado del MES</div>
         </div>
+        <div class="stat">
+          <div class="ci-stat-num" style="color:var(--ci-cyan)" id="eff-hits">—</div>
+          <div class="cap">Hits / sesiones</div>
+        </div>
+      </div>
+
+      <div class="ci-tile eff-tile">
+        <p class="ci-kicker">Últimos sorteos · predicho vs ganador real</p>
+        <table class="eff-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Mañana · 12:55</th>
+              <th>Mediatarde · 4:30</th>
+              <th>Tarde · 7:30</th>
+            </tr>
+          </thead>
+          <tbody id="eff-tbody">
+            <tr><td colspan="4" class="empty-state">Cargando histórico…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="ci-tile ci-tile--dark month-tile" id="month-tile">
+        <div class="empty-state" style="color:#a1a1a6">Cargando agregados del mes…</div>
       </div>
     </section>
 
   </main>
 
-  <!-- Footer con lockup CoreIntel -->
   <footer>
     <div class="wrap fw">
       <span class="ci-lockup">Powered by <img src="assets/brand/logo-principal.png" alt="CoreIntel — Coreintelhub" /></span>
-      <span id="footer-meta">JPS Tiempos · backtest 519 sorteos</span>
+      <span id="footer-meta">JPS Tiempos · paper trading</span>
     </div>
   </footer>
 
+
   <script>
-    // ============================================================
-    // Helpers
-    // ============================================================
-    const $ = (id) => document.getElementById(id);
-    const colors = ['dot-core', 'dot-naranja', 'dot-cyan', 'dot-lima', 'dot-amarillo', 'dot-intel'];
-    const fmtMoney = (n) => '₡' + Math.round(n).toLocaleString('es-CR');
-    const fmtPct = (n, signed = false) => (signed && n > 0 ? '+' : '') + (n * 100).toFixed(2) + '%';
-    const SESSION_LABEL = { manana: 'Mañana · 12:55pm', mediaTarde: 'Mediatarde · 4:30pm', tarde: 'Tarde · 7:30pm' };
+    // ════════════════════════════════════════════════════════════
+    // CONSTANTES
+    // ════════════════════════════════════════════════════════════
+    const EXACTO_MULT = 70;
+    const SESSION_LABEL = {
+      manana:     { label: 'Mañana · 12:55pm',     hour: 13, color: 'dot-core' },
+      mediaTarde: { label: 'Mediatarde · 4:30pm', hour: 17, color: 'dot-naranja' },
+      tarde:      { label: 'Tarde · 7:30pm',       hour: 20, color: 'dot-lima' },
+    };
+    const SESSIONS = ['manana', 'mediaTarde', 'tarde'];
+    const DEFAULT_BET_PER_NUMBER = 1000;
+
+    // ════════════════════════════════════════════════════════════
+    // HELPERS
+    // ════════════════════════════════════════════════════════════
+    const $ = id => document.getElementById(id);
+    const fmtMoney = (n, signed=false) => (signed && n > 0 ? '+' : (n < 0 ? '−' : '')) + '₡' + Math.abs(Math.round(n)).toLocaleString('es-CR');
+    const fmtPct = (n) => (n*100).toFixed(2) + '%';
+    const parseDateOnly = s => (s||'').split('T')[0];
+    const todayISO = () => new Date().toISOString().slice(0,10);
+    const monthOf = s => (s||'').slice(0,7);
 
     async function fetchJSON(url) {
-      try {
-        const r = await fetch(url);
-        if (!r.ok) throw new Error(r.status);
-        return await r.json();
-      } catch (e) {
-        return null;
-      }
+      try { const r = await fetch(url); if (!r.ok) throw 0; return await r.json(); }
+      catch(e) { return null; }
     }
-
     async function fetchJSONL(url) {
       try {
-        const r = await fetch(url);
-        if (!r.ok) throw new Error(r.status);
-        const txt = await r.text();
-        return txt.split('\n').filter(l => l.trim()).map(l => JSON.parse(l));
-      } catch (e) {
-        return [];
+        const r = await fetch(url); if (!r.ok) throw 0;
+        const t = await r.text();
+        return t.split('\n').filter(l => l.trim()).map(l => JSON.parse(l));
+      } catch(e) { return []; }
+    }
+    async function postJSON(url, payload) {
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload),
+        });
+        return await r.json();
+      } catch(e) { return {error: String(e)}; }
+    }
+
+    function countdown(targetHour) {
+      const now = new Date();
+      const target = new Date(now);
+      target.setHours(targetHour, 0, 0, 0);
+      if (now >= target) target.setDate(target.getDate() + 1);
+      const ms = target - now;
+      const h = Math.floor(ms / 3600000);
+      const m = Math.floor((ms % 3600000) / 60000);
+      return h > 0 ? `En ${h}h ${m}min` : `En ${m}min`;
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // DATA — fetched once, cached
+    // ════════════════════════════════════════════════════════════
+    let LOG = [];                       // todas las líneas del JSONL
+    let LATEST = {};                    // última línea por id (source of truth)
+    let HISTORY = null;                 // historical_data.json (para Section 3 winners)
+    let WINNERS_INDEX = {};             // {dia-session: numero}
+
+    function rebuildLatest() {
+      LATEST = {};
+      for (const rec of LOG) {
+        const id = rec.id;
+        if (!id) continue;
+        if (!LATEST[id]) {
+          LATEST[id] = { ...rec, history: [] };
+        } else {
+          // Merge: keep base fields from earliest record but overwrite status/metadata from later
+          LATEST[id] = { ...LATEST[id], ...rec };
+        }
+        LATEST[id].history.push(rec);
       }
     }
 
-    // ============================================================
-    // Hero: estrategia campeón desde backtest_report.json
-    // ============================================================
-    async function renderHero() {
-      const report = await fetchJSON('backtest_report.json');
-      if (!report || !report.strategies) {
-        $('hero-headline').textContent = 'Sin backtest disponible';
-        $('hero-sub').textContent = 'Correr `python3 jps_backtest.py` para generar el reporte.';
-        return;
+    function buildWinnersIndex() {
+      WINNERS_INDEX = {};
+      if (!HISTORY || !Array.isArray(HISTORY)) return;
+      for (const day of HISTORY) {
+        const dia = parseDateOnly(day.dia);
+        for (const sess of SESSIONS) {
+          const draw = day[sess];
+          if (draw && draw.numero != null) {
+            WINNERS_INDEX[`${dia}-${sess}`] = {
+              numero: String(draw.numero).padStart(2,'0'),
+              reventada: draw.in_reventado === 1 ? 'SI' : 'NO',
+              mega: draw.meganNumero,
+            };
+          }
+        }
       }
-      const sorted = Object.values(report.strategies).sort((a, b) => b.roi_total - a.roi_total);
-      const champ = sorted[0];
-      $('hero-eyebrow').textContent = 'Estrategia campeón · ' + champ.profile;
-      $('hero-headline').textContent = champ.strategy + ' — ROI ' + fmtPct(champ.roi_total, true);
-      const cfg = report.config;
-      const pvalNote = champ.p_value_vs_baseline_permtest != null
-        ? ' · p=' + champ.p_value_vs_baseline_permtest.toFixed(3)
-        : '';
-      $('hero-sub').textContent =
-        'Backtest sobre ' + cfg.n_total_draws + ' sorteos · hit rate '
-        + (champ.hit_rate * 100).toFixed(2) + '% vs 4.9% teórico' + pvalNote + '.';
-      $('stat-hits').textContent = champ.n_hits + '/' + champ.n_sessions;
-      $('stat-roi').textContent = fmtPct(champ.roi_total, true);
-      $('stat-neto').textContent = (champ.total_neto >= 0 ? '+' : '') + fmtMoney(champ.total_neto);
-      $('footer-meta').textContent = 'JPS Tiempos · backtest ' + cfg.n_total_draws + ' sorteos · ' + cfg.n_test + ' test · seed ' + cfg.rng_seed;
     }
 
-    // ============================================================
-    // Predicciones del día
-    // ============================================================
-    async function renderPredicciones() {
-      const records = await fetchJSONL('predictions_log.jsonl');
-      const container = $('tiles-predicciones');
+    // ════════════════════════════════════════════════════════════
+    // OUTCOME calc — per id, returns net & investment & state
+    // ════════════════════════════════════════════════════════════
+    function computeOutcome(pred) {
+      // Returns: {state, invested, recovered, net, winner, hit}
+      // state ∈ {pending, committed_pending, skipped, won, lost, neutral_pred}
+      const id = pred.id;
+      const status = pred.status;
+      const tickets = (pred.tickets || []).length;
+      const betPerNum = pred.actual_bet_per_ticket || 0;  // 0 si no confirmó
+      const drawKey = `${pred.draw_date}-${pred.session}`;
+      const drawn = WINNERS_INDEX[drawKey];
 
-      // Agrupar por id (última línea por id es source of truth)
-      const latest = {};
-      for (const r of records) latest[r.id] = r;
-      const today = new Date().toISOString().slice(0, 10);
-      // Predicciones para hoy y mañana, todas pending
-      const pending = Object.values(latest)
-        .filter(r => r.status === 'pending' && r.draw_date >= today)
-        .sort((a, b) => (a.draw_date + a.session).localeCompare(b.draw_date + b.session));
+      if (status === 'skipped') {
+        return { state: 'skipped', invested: 0, recovered: 0, net: 0, winner: drawn, hit: false };
+      }
 
-      if (pending.length === 0) {
-        container.innerHTML = '<div class="ci-tile" style="grid-column:1/-1"><div class="tile-inner empty-state">Sin predicciones pendientes. Corre <code>python3 jps_predict.py --session manana</code></div></div>';
+      if (status === 'reconciled' && pred.result) {
+        // Reconciler ya calculó. Si user había committed, usar su monto; sino, no contar como dinero real.
+        const r = pred.result;
+        const userCommitted = betPerNum > 0;
+        if (userCommitted) {
+          const invested = tickets * betPerNum;
+          const recovered = r.any_hit ? (EXACTO_MULT * betPerNum) : 0;
+          return { state: r.any_hit ? 'won' : 'lost', invested, recovered, net: recovered - invested, winner: drawn, hit: r.any_hit };
+        }
+        return { state: 'neutral_pred', invested: 0, recovered: 0, net: 0, winner: drawn, hit: r.any_hit };
+      }
+
+      if (status === 'committed' || (status === 'pending' && betPerNum > 0)) {
+        if (drawn) {
+          // Resultado disponible pero aún no reconciliado
+          const ticketsArr = pred.tickets || [];
+          const drawnNum = parseInt(drawn.numero, 10);
+          const hit = ticketsArr.some(t => parseInt(t.num,10) === drawnNum);
+          const invested = tickets * betPerNum;
+          const recovered = hit ? EXACTO_MULT * betPerNum : 0;
+          return { state: hit ? 'won' : 'lost', invested, recovered, net: recovered - invested, winner: drawn, hit };
+        }
+        return { state: 'committed_pending', invested: tickets * betPerNum, recovered: 0, net: 0, winner: null, hit: false };
+      }
+
+      // pending sin commitear monto
+      if (drawn) {
+        const ticketsArr = pred.tickets || [];
+        const drawnNum = parseInt(drawn.numero, 10);
+        const hit = ticketsArr.some(t => parseInt(t.num,10) === drawnNum);
+        return { state: 'neutral_pred', invested: 0, recovered: 0, net: 0, winner: drawn, hit };
+      }
+      return { state: 'pending', invested: 0, recovered: 0, net: 0, winner: null, hit: false };
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // SECCIÓN 1 — Ganancias
+    // ════════════════════════════════════════════════════════════
+    function renderGanancias() {
+      let invertido = 0, recuperado = 0;
+      const series = [];  // [{date, cumulative_net}]
+      const sorted = Object.values(LATEST).sort((a,b) => {
+        return (a.draw_date + a.session).localeCompare(b.draw_date + b.session);
+      });
+      let cum = 0;
+      for (const pred of sorted) {
+        const out = computeOutcome(pred);
+        if (out.invested > 0) {
+          invertido += out.invested;
+          recuperado += out.recovered;
+          cum += out.net;
+          series.push({ date: pred.draw_date, cum });
+        }
+      }
+      const neto = recuperado - invertido;
+      const roi = invertido > 0 ? neto / invertido : null;
+
+      const netoEl = $('neto-num');
+      netoEl.textContent = fmtMoney(neto, true);
+      netoEl.classList.remove('positive', 'negative', 'zero');
+      netoEl.classList.add(neto > 0 ? 'positive' : (neto < 0 ? 'negative' : 'zero'));
+
+      $('stat-invertido').textContent = fmtMoney(invertido);
+      $('stat-recuperado').textContent = fmtMoney(recuperado);
+      $('stat-roi').textContent = roi != null ? (roi*100).toFixed(1) + '%' : '—';
+
+      renderSparkline(series);
+    }
+
+    function renderSparkline(series) {
+      const svg = $('sparkline');
+      svg.innerHTML = '';
+      if (series.length < 2) {
+        svg.innerHTML = '<text x="50%" y="50" text-anchor="middle" fill="#999" font-size="13">Sin datos suficientes todavía. Confirmá apuestas para verlas aquí.</text>';
+        $('spark-labels').innerHTML = '<span>—</span><span>hoy</span>';
+        return;
+      }
+      const W = 700, H = 100, PAD = 8;
+      const vals = series.map(p => p.cum);
+      const min = Math.min(...vals, 0), max = Math.max(...vals, 0);
+      const range = (max - min) || 1;
+      const stepX = (W - 2*PAD) / (series.length - 1);
+      const pts = series.map((p, i) => {
+        const x = PAD + i * stepX;
+        const y = H - PAD - ((p.cum - min) / range) * (H - 2*PAD);
+        return `${x},${y}`;
+      }).join(' ');
+      // Zero line
+      const zeroY = H - PAD - ((0 - min) / range) * (H - 2*PAD);
+      svg.innerHTML = `
+        <line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="#e5e5ea" stroke-width="1" stroke-dasharray="3,3"/>
+        <polyline points="${pts}" fill="none" stroke="var(--ci-core)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        ${series.map((p, i) => {
+          const x = PAD + i * stepX;
+          const y = H - PAD - ((p.cum - min) / range) * (H - 2*PAD);
+          return `<circle cx="${x}" cy="${y}" r="3" fill="var(--ci-core)"/>`;
+        }).join('')}
+      `;
+      $('spark-labels').innerHTML = `<span>${series[0].date}</span><span>${series[series.length-1].date}</span>`;
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // SECCIÓN 2 — Predicciones del día
+    // ════════════════════════════════════════════════════════════
+    function renderPredicciones() {
+      const today = todayISO();
+      // Sesiones pendientes (status=pending) o ya committed/skipped pero del día actual
+      const candidates = Object.values(LATEST)
+        .filter(r => r.draw_date >= today && SESSIONS.includes(r.session))
+        .sort((a,b) => (a.draw_date + SESSIONS.indexOf(a.session)).localeCompare(b.draw_date + SESSIONS.indexOf(b.session)));
+
+      const grid = $('pred-grid');
+
+      if (candidates.length === 0) {
+        grid.innerHTML = '<div class="ci-tile"><div class="empty-state">Sin predicciones para hoy. Corre <code>python3 jps_predict.py --session manana --strategy weekday_recent30</code></div></div>';
         return;
       }
 
-      container.innerHTML = '';
-      pending.slice(0, 3).forEach((rec, idx) => {
-        const tile = document.createElement('div');
-        const isDark = idx === 0;  // primera predicción destacada en tile oscuro
-        tile.className = 'ci-tile' + (isDark ? ' ci-tile--dark' : '');
-        const dotClass = colors[idx % colors.length];
-        const payout = Math.round(70 * (rec.budget / rec.n_tickets));  // 70× single ticket base
-        tile.innerHTML = `
-          <div class="tile-inner">
-            <p class="ci-kicker"><span class="ci-dot ${dotClass}"></span>${SESSION_LABEL[rec.session] || rec.session}</p>
-            <p class="meta">${rec.draw_date}</p>
-            <p class="name">${rec.strategy}</p>
-            <div class="nums">${rec.tickets.map(t => '<span>' + t.num + '</span>').join('')}</div>
-            <p class="meta">Budget ${fmtMoney(rec.budget)} · Payout si HIT ${fmtMoney(payout)}</p>
+      // Tomar primera predicción para mostrar strategy en banner
+      const firstStrat = candidates[0].strategy || 'weekday_recent30';
+      $('strat-name').textContent = firstStrat;
+      const dt = new Date(candidates[0].draw_date + 'T12:00:00');
+      const wdNames = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+      $('strat-context').textContent = `${wdNames[(dt.getDay()+6)%7]} · ${candidates[0].n_draws_used_for_analysis || '—'} sorteos analizados`;
+
+      grid.innerHTML = '';
+      candidates.slice(0, 3).forEach(pred => {
+        const sessInfo = SESSION_LABEL[pred.session];
+        const card = document.createElement('div');
+        card.className = 'ci-tile pred-card';
+        if (pred.status === 'committed') card.classList.add('committed');
+        if (pred.status === 'skipped') card.classList.add('skipped');
+
+        const tickets = pred.tickets || [];
+        const betDefault = pred.actual_bet_per_ticket || DEFAULT_BET_PER_NUMBER;
+
+        let statusTag = '';
+        if (pred.status === 'committed') statusTag = `<span class="pred-status-tag committed">✓ Confirmado · ₡${pred.actual_bet_per_ticket}/n</span>`;
+        else if (pred.status === 'skipped') statusTag = `<span class="pred-status-tag skipped">Saltado</span>`;
+
+        // selected_numbers: si ya hay un commit con selección, respetarlo. Si no, todos.
+        const isLocked = pred.status === 'committed' || pred.status === 'skipped';
+        let selected = new Set();
+        if (pred.selected_numbers && Array.isArray(pred.selected_numbers)) {
+          pred.selected_numbers.forEach(n => selected.add(n));
+        } else {
+          tickets.forEach(t => selected.add(t.num));  // default = todos
+        }
+        SELECTION_STATE[pred.id] = selected;
+
+        card.innerHTML = `
+          <div class="pred-head">
+            <div class="pred-session">
+              <span class="ci-dot ${sessInfo.color}"></span>
+              ${sessInfo.label}
+            </div>
+            <div class="countdown">${statusTag || countdown(sessInfo.hour)}</div>
           </div>
+          <div class="ci-kicker" style="margin-bottom:8px">Números recomendados${isLocked ? '' : ' · clic para activar/desactivar'}</div>
+          <div class="pred-numbers" data-pred-id="${pred.id}">
+            ${tickets.map(t => {
+              const isSelected = selected.has(t.num);
+              const cls = isLocked
+                ? (isSelected ? 'num-chip locked committed' : 'num-chip unselected locked')
+                : (isSelected ? 'num-chip' : 'num-chip unselected');
+              return `<span class="${cls}" data-num="${t.num}">${t.num}</span>`;
+            }).join('')}
+          </div>
+          <div class="num-hint">
+            <span class="count-strong" data-selcount="${pred.id}">${selected.size}</span> de ${tickets.length} números activos
+          </div>
+
+          <div class="bet-row">
+            <label>Mi apuesta por número:</label>
+            <div class="bet-input">
+              <span class="prefix">₡</span>
+              <input type="number" min="100" step="100" value="${betDefault}" data-id="${pred.id}" ${isLocked ? 'disabled' : ''}/>
+            </div>
+          </div>
+          <div class="pred-calc">
+            Inversión total: <strong data-total="${pred.id}">${fmtMoney(selected.size * betDefault)}</strong>
+            · Si acierta: <strong data-payout="${pred.id}">${fmtMoney(EXACTO_MULT * betDefault - selected.size * betDefault, true)}</strong> neto
+          </div>
+          ${pred.status === 'pending' ? `
+            <div class="pred-actions">
+              <button class="btn-confirm" data-action="confirm" data-id="${pred.id}">Confirmar apuesta</button>
+              <button class="btn-skip" data-action="skip" data-id="${pred.id}">Saltar este sorteo</button>
+            </div>
+          ` : ''}
         `;
-        container.appendChild(tile);
+        grid.appendChild(card);
+      });
+
+      // Función para recalcular totales después de cualquier cambio
+      function recalc(id) {
+        const sel = SELECTION_STATE[id];
+        const inp = grid.querySelector(`input[data-id="${id}"]`);
+        const bet = parseInt(inp.value, 10) || 0;
+        const total = bet * sel.size;
+        const payout = EXACTO_MULT * bet - total;
+        const totalEl = grid.querySelector(`[data-total="${id}"]`);
+        const payoutEl = grid.querySelector(`[data-payout="${id}"]`);
+        const countEl = grid.querySelector(`[data-selcount="${id}"]`);
+        if (totalEl) totalEl.textContent = fmtMoney(total);
+        if (payoutEl) payoutEl.textContent = fmtMoney(payout, true);
+        if (countEl) countEl.textContent = sel.size;
+      }
+
+      // Click sobre número → toggle
+      grid.querySelectorAll('.pred-numbers').forEach(group => {
+        const predId = group.dataset.predId;
+        group.querySelectorAll('.num-chip').forEach(chip => {
+          if (chip.classList.contains('locked')) return;
+          chip.addEventListener('click', () => {
+            const num = chip.dataset.num;
+            const sel = SELECTION_STATE[predId];
+            if (sel.has(num)) {
+              if (sel.size === 1) { return; /* no permitir 0 números seleccionados */ }
+              sel.delete(num);
+              chip.classList.add('unselected');
+            } else {
+              sel.add(num);
+              chip.classList.remove('unselected');
+            }
+            recalc(predId);
+          });
+        });
+      });
+
+      // Input listener
+      grid.querySelectorAll('input[data-id]').forEach(inp => {
+        inp.addEventListener('input', () => recalc(inp.dataset.id));
+      });
+
+      // Botones
+      grid.querySelectorAll('button[data-action]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.id;
+          const action = btn.dataset.action;
+          if (action === 'confirm') {
+            const input = grid.querySelector(`input[data-id="${id}"]`);
+            const bet = parseInt(input.value, 10);
+            if (!bet || bet < 100) { alert('Apuesta mínima ₡100'); return; }
+            const selected_numbers = Array.from(SELECTION_STATE[id]);
+            if (selected_numbers.length === 0) { alert('Tenés que dejar al menos 1 número activo'); return; }
+            btn.disabled = true; btn.textContent = 'Guardando…';
+            const resp = await postJSON('/api/commit', { id, bet_per_ticket: bet, selected_numbers });
+            if (resp && !resp.error) { await reloadAll(); }
+            else { alert('Error: ' + (resp.error || 'desconocido')); btn.disabled = false; btn.textContent = 'Confirmar apuesta'; }
+          } else if (action === 'skip') {
+            btn.disabled = true; btn.textContent = 'Saltando…';
+            const resp = await postJSON('/api/skip', { id });
+            if (resp && !resp.error) { await reloadAll(); }
+            else { alert('Error: ' + (resp.error || 'desconocido')); btn.disabled = false; btn.textContent = 'Saltar'; }
+          }
+        });
       });
     }
 
-    // ============================================================
-    // Ranking — top-5 estrategias por ROI
-    // ============================================================
-    async function renderRanking() {
-      const report = await fetchJSON('backtest_report.json');
-      const tile = $('ranking-tile');
-      if (!report || !report.strategies) {
-        tile.innerHTML = '<div class="empty-state" style="color:#a1a1a6">Sin backtest_report.json todavía.</div>';
+    // ════════════════════════════════════════════════════════════
+    // SECCIÓN 3 — Efectividad
+    // ════════════════════════════════════════════════════════════
+    function renderEfectividad() {
+      // Stats: efectividad de inferencia (predicción vs ganador) — independiente de si user apostó
+      // hit = predicción acertó al menos un número
+      const today = todayISO();
+      const month = today.slice(0,7);
+      let hitsToday = 0, sessToday = 0;
+      let hitsMonth = 0, sessMonth = 0;
+      let hitsTotal = 0, sessTotal = 0;
+
+      for (const pred of Object.values(LATEST)) {
+        const drawKey = `${pred.draw_date}-${pred.session}`;
+        const drawn = WINNERS_INDEX[drawKey];
+        if (!drawn) continue;  // sin resultado todavía
+        const ticketsArr = pred.tickets || [];
+        const drawnNum = parseInt(drawn.numero, 10);
+        const hit = ticketsArr.some(t => parseInt(t.num,10) === drawnNum);
+        sessTotal++;
+        if (hit) hitsTotal++;
+        if (pred.draw_date === today) { sessToday++; if (hit) hitsToday++; }
+        if (monthOf(pred.draw_date) === month) { sessMonth++; if (hit) hitsMonth++; }
+      }
+
+      $('eff-today').textContent = sessToday > 0 ? (hitsToday/sessToday*100).toFixed(0) + '%' : '—';
+      $('eff-month').textContent = sessMonth > 0 ? (hitsMonth/sessMonth*100).toFixed(1) + '%' : '—';
+      $('eff-hits').textContent = sessTotal > 0 ? `${hitsTotal}/${sessTotal}` : '0/0';
+
+      // ── Tabla histórica
+      renderEffTable();
+      renderMonthTile(month, hitsMonth, sessMonth);
+    }
+
+    function renderEffTable() {
+      // Agrupar por fecha, 3 columnas (manana/mediaTarde/tarde)
+      const byDate = {};
+      for (const pred of Object.values(LATEST)) {
+        if (!SESSIONS.includes(pred.session)) continue;
+        const d = pred.draw_date;
+        if (!byDate[d]) byDate[d] = { manana: null, mediaTarde: null, tarde: null };
+        byDate[d][pred.session] = pred;
+      }
+      const dates = Object.keys(byDate).sort().reverse().slice(0, 12);
+      const today = todayISO();
+      const tbody = $('eff-tbody');
+      if (dates.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Sin histórico todavía.</td></tr>';
         return;
       }
-      const sorted = Object.values(report.strategies).sort((a, b) => b.roi_total - a.roi_total).slice(0, 6);
-
-      const rows = sorted.map((st, i) => {
-        const dotClass = colors[i % colors.length];
-        const pval = st.p_value_vs_baseline_permtest;
-        const sig = (pval != null && pval < 0.05) ? 'sig' : '';
-        const pvalText = pval != null ? 'p=' + pval.toFixed(3) : 'baseline';
-        const roiText = fmtPct(st.roi_total, true);
-        const roiColor = st.roi_total >= 0 ? 'var(--ci-lima)' : '#ff7878';
-        return `
-          <div class="ranking-row ${sig}">
-            <div class="lbl">
-              <span class="rank">${i + 1}</span>
-              <span class="ci-dot ${dotClass}"></span>
-              <span class="name">${st.strategy}</span>
-            </div>
-            <div style="display:flex; align-items:center; gap:18px">
-              <span class="roi" style="color:${roiColor}">${roiText}</span>
-              <span class="pval">${pvalText}</span>
-            </div>
-          </div>
-        `;
+      tbody.innerHTML = dates.map(d => {
+        const cells = SESSIONS.map(sess => {
+          const pred = byDate[d][sess];
+          if (!pred) return '<td><div class="cell-state skip">— sin predicción</div></td>';
+          const tickets = pred.tickets || [];
+          const drawKey = `${d}-${sess}`;
+          const drawn = WINNERS_INDEX[drawKey];
+          const predNums = tickets.map(t => t.num).join(',');
+          let winnerCell, stateCell;
+          if (!drawn) {
+            winnerCell = '<div class="cell-winner" style="color:var(--ci-text-muted)">⏳</div>';
+            stateCell = '<div class="cell-state pend">pending</div>';
+          } else {
+            const drawnNum = parseInt(drawn.numero, 10);
+            const hit = tickets.some(t => parseInt(t.num,10) === drawnNum);
+            winnerCell = `<div class="cell-winner" style="color:${hit ? '#2d8a2d' : 'var(--ci-text)'}">${drawn.numero}</div>`;
+            if (pred.status === 'skipped') {
+              stateCell = `<div class="cell-state skip">${hit ? '✓ acertó pero no jugado' : 'no jugado'}</div>`;
+            } else {
+              stateCell = `<div class="cell-state ${hit ? 'hit' : 'miss'}">${hit ? '✓ HIT' : '✗ MISS'}</div>`;
+            }
+          }
+          return `<td><div class="cell-pred">${predNums}</div>${winnerCell}${stateCell}</td>`;
+        }).join('');
+        const isToday = d === today;
+        return `<tr class="${isToday ? 'today' : ''}"><td><strong>${d}</strong>${isToday ? '<div style="font-size:11px;color:var(--ci-text-muted)">HOY</div>' : ''}</td>${cells}</tr>`;
       }).join('');
-      tile.innerHTML = rows;
     }
 
-    // ============================================================
-    // Track record
-    // ============================================================
-    async function renderTrack() {
-      const records = await fetchJSONL('predictions_log.jsonl');
-      const latest = {};
-      for (const r of records) latest[r.id] = r;
-      const pending = Object.values(latest).filter(r => r.status === 'pending');
-      const reconciled = Object.values(latest).filter(r => r.status === 'reconciled');
-
-      $('track-pending').textContent = pending.length;
-      if (pending.length > 0) {
-        const next = pending.sort((a, b) => a.draw_date.localeCompare(b.draw_date))[0];
-        $('track-pending-meta').textContent = 'Próximo: ' + next.draw_date + ' · ' + (SESSION_LABEL[next.session] || next.session);
-      } else {
-        $('track-pending-meta').textContent = 'Sin pendientes.';
-      }
-
-      $('track-reconciled').textContent = reconciled.length;
-      if (reconciled.length > 0) {
-        const hits = reconciled.filter(r => r.result && r.result.any_hit);
-        const last = reconciled.sort((a, b) => b.reconciled_at.localeCompare(a.reconciled_at))[0];
-        const lastHit = hits.length > 0 ? hits[hits.length - 1] : null;
-        if (lastHit) {
-          $('track-reconciled-meta').textContent =
-            hits.length + ' hits · última: ' + lastHit.draw_date + ' num ' + lastHit.result.drawn_exacto;
-        } else {
-          $('track-reconciled-meta').textContent = '0 hits aún · última: ' + last.draw_date;
-        }
-      } else {
-        $('track-reconciled-meta').textContent = 'Sin reconciliaciones aún.';
-      }
+    function renderMonthTile(month, hits, sess) {
+      const tile = $('month-tile');
+      const eff = sess > 0 ? (hits/sess*100).toFixed(2) : '0.00';
+      const teorica = 4.90;
+      const lift = sess > 0 ? (eff - teorica).toFixed(2) : '0.00';
+      tile.innerHTML = `
+        <div class="month-row title">Resumen ${month}</div>
+        <div class="month-row"><span>Sesiones con resultado</span><span><strong style="color:#fff">${sess}</strong></span></div>
+        <div class="month-row"><span>Hits</span><span><strong style="color:var(--ci-lima)">${hits}</strong></span></div>
+        <div class="month-row"><span>Efectividad real</span><span><strong style="color:var(--ci-core)">${eff}%</strong></span></div>
+        <div class="month-row"><span>Efectividad teórica (uniforme)</span><span style="color:#a1a1a6">4.90%</span></div>
+        <div class="month-row"><span>Lift vs teórica</span><span style="color:${parseFloat(lift)>=0?'var(--ci-lima)':'#ff7878'}"><strong>${parseFloat(lift)>=0?'+':''}${lift} pp</strong></span></div>
+      `;
     }
 
-    // ============================================================
-    // Boot
-    // ============================================================
-    (async function init() {
-      await Promise.all([
-        renderHero(),
-        renderPredicciones(),
-        renderRanking(),
-        renderTrack(),
+    // ════════════════════════════════════════════════════════════
+    // RELOAD ALL — fetch + rebuild + render
+    // ════════════════════════════════════════════════════════════
+    async function reloadAll() {
+      [LOG, HISTORY] = await Promise.all([
+        fetchJSONL('predictions_log.jsonl'),
+        fetchJSON('historical_data.json'),
       ]);
-    })();
+      rebuildLatest();
+      buildWinnersIndex();
+      renderGanancias();
+      renderPredicciones();
+      renderEfectividad();
+    }
+
+    reloadAll();
   </script>
 </body>
 </html>

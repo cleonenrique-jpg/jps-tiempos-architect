@@ -424,7 +424,7 @@ def pipeline(params):
 # ─── HTTP SERVER ───────────────────────────────────────────────────────────────
 CORS = {
     "Access-Control-Allow-Origin":  "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
 }
 
@@ -471,6 +471,56 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header(k, v)
         self.end_headers()
 
+    def do_POST(self):
+        parsed = urllib.parse.urlparse(self.path)
+        try:
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            body_raw = self.rfile.read(length) if length else b""
+            payload = json.loads(body_raw.decode("utf-8")) if body_raw else {}
+        except Exception as e:
+            self.send_json({"error": f"invalid JSON body: {e}"}, 400)
+            return
+
+        try:
+            if parsed.path == "/api/commit":
+                pred_id = payload.get("id")
+                bet_per_ticket = int(payload.get("bet_per_ticket", 0))
+                if not pred_id or bet_per_ticket < 100:
+                    self.send_json({"error": "id y bet_per_ticket (>=100) requeridos"}, 400)
+                    return
+                record = {
+                    "id": pred_id,
+                    "supersedes_status": "pending",
+                    "status": "committed",
+                    "actual_bet_per_ticket": bet_per_ticket,
+                    "committed_at": datetime.now().isoformat(),
+                }
+                with open(os.path.join(HERE, "predictions_log.jsonl"), "a", encoding="utf-8") as f:
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                self.send_json({"ok": True, "record": record})
+
+            elif parsed.path == "/api/skip":
+                pred_id = payload.get("id")
+                if not pred_id:
+                    self.send_json({"error": "id requerido"}, 400)
+                    return
+                record = {
+                    "id": pred_id,
+                    "supersedes_status": "pending",
+                    "status": "skipped",
+                    "skipped_at": datetime.now().isoformat(),
+                }
+                with open(os.path.join(HERE, "predictions_log.jsonl"), "a", encoding="utf-8") as f:
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                self.send_json({"ok": True, "record": record})
+
+            else:
+                self.send_json({"error": "Not found"}, 404)
+
+        except Exception as e:
+            import traceback
+            self.send_json({"error": str(e), "trace": traceback.format_exc()[-1500:]}, 500)
+
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         params = dict(urllib.parse.parse_qsl(parsed.query))
@@ -510,6 +560,10 @@ class Handler(BaseHTTPRequestHandler):
 
             elif parsed.path == "/backtest_report.json":
                 p = os.path.join(HERE, "backtest_report.json")
+                self.send_file(p, "application/json; charset=utf-8")
+
+            elif parsed.path == "/historical_data.json":
+                p = os.path.join(HERE, "historical_data.json")
                 self.send_file(p, "application/json; charset=utf-8")
 
             elif parsed.path == "/api/status":

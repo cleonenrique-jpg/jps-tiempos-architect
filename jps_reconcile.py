@@ -78,12 +78,27 @@ def _build_results_index() -> Dict[str, dict]:
 
 
 def _latest_status_by_id(records: List[dict]) -> Dict[str, dict]:
-    """Devuelve, para cada id, la última line (en orden de aparición)."""
-    latest = {}
+    """Devuelve, para cada id, un dict MERGED con todas las líneas del id.
+
+    Como el JSONL es append-only, una predicción puede tener varias líneas:
+    pending → committed (con bet_per_ticket) → reconciled (con result).
+    El merge preserva campos como `tickets` del registro original mientras
+    sobrescribe `status`, `actual_bet_per_ticket`, `result`, etc. desde las
+    actualizaciones posteriores.
+    """
+    latest: Dict[str, dict] = {}
     for rec in records:
         rid = rec.get("id")
-        if rid:
-            latest[rid] = rec
+        if not rid:
+            continue
+        if rid not in latest:
+            latest[rid] = dict(rec)
+        else:
+            # Merge: nuevos campos sobrescriben los viejos, pero los viejos
+            # que no aparezcan en rec se mantienen (preservamos tickets, etc.)
+            merged = dict(latest[rid])
+            merged.update(rec)
+            latest[rid] = merged
     return latest
 
 
@@ -104,6 +119,10 @@ def _reconcile_one(prediction: dict, result: dict) -> dict:
     total_recuperado = 0
     any_hit = False
     ticket_details = []
+    # Si el usuario confirmó una apuesta diferente (vía dashboard /api/commit),
+    # usamos `actual_bet_per_ticket` en lugar del `base` original. Eso refleja
+    # el dinero REAL apostado, no el budget hipotético del predict.
+    actual_bet = prediction.get("actual_bet_per_ticket")
     for t in prediction.get("tickets", []):
         try:
             num = int(t["num"])
@@ -111,6 +130,10 @@ def _reconcile_one(prediction: dict, result: dict) -> dict:
             rev = int(t["rev"])
         except (KeyError, ValueError, TypeError):
             continue
+        if actual_bet is not None and actual_bet > 0:
+            # Override con la inversión real del usuario, rev=0 (exacto-only)
+            base = int(actual_bet)
+            rev = 0
         out = payout_ticket(num, base, rev, drawn_exacto, drawn_rev)
         total_cost += out["cost"]
         total_neto += out["neto"]
@@ -119,6 +142,8 @@ def _reconcile_one(prediction: dict, result: dict) -> dict:
             any_hit = True
         ticket_details.append({
             "num": str(num).zfill(2),
+            "base": base,
+            "rev": rev,
             "hit": out["hit_exacto"],
             "recuperado": out["recuperado"],
             "neto": out["neto"],

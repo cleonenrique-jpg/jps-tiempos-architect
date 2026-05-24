@@ -263,6 +263,9 @@ STRATEGIES = [
     ("weekday_specific",       None,                        "exacto_only"),
     ("proportional_weight",    select_architect,            "proportional"),
     ("inverse_recent",         None,                        "exacto_only"),
+    # ── Champion: combina weekday + decay (mejor desempeño en multi-window walk-forward,
+    # 0 derrotas en 6 ventanas vs architect_exacto_only). Promoted from exploration 2026-05-24.
+    ("weekday_recent30",       None,                        "exacto_only"),
     # ── Baseline (siempre al final para que sirva de referencia)
     ("random_uniform",         None,                        "balanced"),
 ]
@@ -365,8 +368,10 @@ def run_backtest(
                 else:
                     numbers = select_architect(report, n_tickets)
 
-            elif name == "weekday_specific":
+            elif name in ("weekday_specific", "weekday_recent30"):
                 # Análisis filtrado por día de la semana del target.
+                # weekday_recent30 además usa solo los últimos 30 sorteos del mismo weekday
+                # (combina decay temporal + weekday clustering — campeón en multi-window).
                 try:
                     target_date = datetime.fromisoformat(target.get("dia", "").split("T")[0])
                     target_wd = target_date.weekday()
@@ -382,6 +387,8 @@ def run_backtest(
                         pass
                 if len(wd_draws) < 30:
                     continue
+                if name == "weekday_recent30":
+                    wd_draws = wd_draws[-30:]  # últimos 30 del mismo weekday
                 report_wd = _silent_analyze(wd_draws)
                 if not report_wd:
                     continue

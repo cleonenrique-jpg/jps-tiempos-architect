@@ -73,6 +73,7 @@ STRATEGY_SELECTORS = {
 # Estrategias que filtran el corpus antes de analizar (manejadas con special-case)
 DATA_FILTER_STRATEGIES = {
     "weekday_specific",      # solo sorteos del mismo día de la semana
+    "weekday_recent30",      # ★ CAMPEÓN: weekday + últimos 30 del mismo weekday (decay + clustering)
     "session_specific",      # solo sorteos de la misma sesión
     "decay_recent",          # últimos 100 sorteos
     "inverse_recent",        # números que NO han salido en últimos 30
@@ -89,6 +90,7 @@ STRATEGY_PROFILE_OVERRIDE = {
     "concentrated_top1":       "concentrated",
     # Estrategias nuevas usan exacto_only por defecto (mejor EV per colón)
     "weekday_specific":        "exacto_only",
+    "weekday_recent30":        "exacto_only",
     "session_specific":        "exacto_only",
     "decay_recent":            "exacto_only",
     "inverse_recent":          "exacto_only",
@@ -216,7 +218,7 @@ def main():
             print(f"\n  ERROR: estrategia {args.strategy} falló: {e}")
             sys.exit(1)
 
-    elif args.strategy == "weekday_specific":
+    elif args.strategy in ("weekday_specific", "weekday_recent30"):
         target_date = datetime.fromisoformat(f"{draw_date}T00:00:00")
         target_wd = target_date.weekday()
         wd_draws = []
@@ -227,10 +229,14 @@ def main():
                     wd_draws.append(d)
             except (ValueError, TypeError):
                 pass
-        print(f"  Sub-corpus    : {len(wd_draws)} sorteos del mismo weekday ({target_date.strftime('%A')})")
         if len(wd_draws) < 30:
             print(f"\n  ERROR: solo {len(wd_draws)} sorteos para weekday {target_wd}. Mínimo 30.")
             sys.exit(1)
+        if args.strategy == "weekday_recent30":
+            wd_draws = wd_draws[-30:]
+            print(f"  Sub-corpus    : últimos 30 sorteos de {target_date.strftime('%A')} (campeón multi-window)")
+        else:
+            print(f"  Sub-corpus    : {len(wd_draws)} sorteos del mismo weekday ({target_date.strftime('%A')})")
         report_wd = _silent_analyze(wd_draws)
         numbers = select_architect(report_wd, args.n)
 

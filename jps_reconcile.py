@@ -182,7 +182,10 @@ def main():
         return
 
     latest = _latest_status_by_id(records)
-    pending = [r for r in latest.values() if r.get("status") == "pending"]
+    # Reconciliar tanto predicciones pending (registro automático sin apostar)
+    # como committed (el usuario confirmó una apuesta real con monto). Ambas
+    # tienen tickets[] y necesitan saber si acertaron contra el ganador.
+    pending = [r for r in latest.values() if r.get("status") in ("pending", "committed")]
     if args.since:
         pending = [r for r in pending if r.get("draw_date", "") >= args.since]
 
@@ -214,11 +217,13 @@ def main():
             new_record = {
                 "id": pid,
                 "reconciled_at": datetime.now(timezone.utc).isoformat(),
-                "supersedes_status": "pending",
+                "supersedes_status": pred.get("status", "pending"),
                 "draw_date": pred.get("draw_date"),
                 "session": pred.get("session"),
                 "strategy": pred.get("strategy"),
                 "profile": pred.get("profile"),
+                "user_committed": pred.get("status") == "committed",
+                "actual_bet_per_ticket": pred.get("actual_bet_per_ticket"),
                 "status": "reconciled",
                 "result": outcome,
             }

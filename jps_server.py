@@ -1511,12 +1511,107 @@ function renderArchitect(top25,anom,output,budget,profile){
 """
 
 
+# ─── AUTO SCHEDULER ────────────────────────────────────────────────────────────
+# Schedule diario: predict adaptive 50min antes de cada sorteo, fetch+reconcile
+# 30-60min después. Horarios JPS oficiales: 12:55 / 16:30 / 19:30.
+SCHEDULE = [
+    # (hour, minute, kind, args)
+    (12,  5, "predict",         ["--session", "manana",     "--strategy", "adaptive", "--force"]),
+    (13, 30, "fetch_reconcile", None),
+    (15, 40, "predict",         ["--session", "mediaTarde", "--strategy", "adaptive", "--force"]),
+    (17,  0, "fetch_reconcile", None),
+    (18, 40, "predict",         ["--session", "tarde",      "--strategy", "adaptive", "--force"]),
+    (20,  0, "fetch_reconcile", None),
+]
+_last_run_per_slot = {}  # {(h, m, kind): date} → evita ejecutar 2 veces el mismo slot el mismo día
+
+
+def _sched_log(msg):
+    """Log con timestamp para debugging del scheduler."""
+    print(f"[SCHED {datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
+
+
+def _run_predict_sched(args):
+    cmd = [sys.executable, os.path.join(HERE, "jps_predict.py")] + args
+    _sched_log(f"→ predict: {' '.join(args)}")
+    try:
+        r = subprocess.run(cmd, cwd=HERE, capture_output=True, text=True, timeout=120)
+        if r.returncode == 0:
+            _sched_log(f"✓ predict ok")
+        else:
+            _sched_log(f"✗ predict failed (rc={r.returncode}): {r.stderr[-300:]}")
+    except subprocess.TimeoutExpired:
+        _sched_log("✗ predict timeout 120s")
+    except Exception as e:
+        _sched_log(f"✗ predict error: {e}")
+
+
+def _run_fetch_reconcile_sched():
+    _sched_log("→ fetch --mode history --days 7 + reconcile")
+    try:
+        r1 = subprocess.run(
+            [sys.executable, os.path.join(HERE, "jps_edge_tool.py"), "fetch", "--mode", "history", "--days", "7"],
+            cwd=HERE, capture_output=True, text=True, timeout=120,
+        )
+        if r1.returncode != 0:
+            _sched_log(f"✗ fetch failed: {r1.stderr[-200:]}")
+            return
+        r2 = subprocess.run(
+            [sys.executable, os.path.join(HERE, "jps_reconcile.py")],
+            cwd=HERE, capture_output=True, text=True, timeout=120,
+        )
+        if r2.returncode == 0:
+            # extract última línea útil del stdout
+            lines = [l for l in r2.stdout.split("\n") if l.strip()]
+            tail = lines[-3:] if len(lines) >= 3 else lines
+            _sched_log("✓ reconcile ok")
+            for l in tail:
+                _sched_log(f"    {l}")
+        else:
+            _sched_log(f"✗ reconcile failed: {r2.stderr[-200:]}")
+    except subprocess.TimeoutExpired:
+        _sched_log("✗ fetch+reconcile timeout")
+    except Exception as e:
+        _sched_log(f"✗ fetch+reconcile error: {e}")
+
+
+def _scheduler_loop():
+    import time as _time
+    _sched_log(f"Scheduler iniciado · {len(SCHEDULE)} slots/día")
+    for h, m, kind, _args in SCHEDULE:
+        _sched_log(f"  {h:02d}:{m:02d}  →  {kind}")
+    while True:
+        try:
+            now = datetime.now()
+            today = now.date()
+            for h, m, kind, args in SCHEDULE:
+                if now.hour == h and now.minute == m:
+                    key = (h, m, kind)
+                    if _last_run_per_slot.get(key) == today:
+                        continue
+                    _last_run_per_slot[key] = today
+                    if kind == "predict":
+                        _run_predict_sched(args)
+                    elif kind == "fetch_reconcile":
+                        _run_fetch_reconcile_sched()
+        except Exception as e:
+            _sched_log(f"loop error: {e}")
+        _time.sleep(45)  # check ~cada 45s (no nos saltamos un minuto)
+
+
+def start_scheduler():
+    import threading
+    t = threading.Thread(target=_scheduler_loop, daemon=True)
+    t.start()
+
+
 # ─── MAIN ──────────────────────────────────────────────────────────────────────
 def main():
     import sys
     if sys.stdout.encoding and sys.stdout.encoding.lower().replace("-", "") not in ("utf8", "utf16"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     server = HTTPServer(("127.0.0.1", PORT), Handler)
+    start_scheduler()
     print(f"""
 +--------------------------------------------------------------+
 |       JPS TIEMPOS LAB -- Dashboard activo  v1.0             |

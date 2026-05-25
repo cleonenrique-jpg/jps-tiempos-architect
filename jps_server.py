@@ -1539,7 +1539,13 @@ def _run_predict_sched(args):
         if r.returncode == 0:
             _sched_log(f"✓ predict ok")
         else:
-            _sched_log(f"✗ predict failed (rc={r.returncode}): {r.stderr[-300:]}")
+            # Capturar AMBOS stdout y stderr — el predict imprime errores
+            # a stdout también (ej. "ya existe predicción pending para X")
+            err_combined = (r.stderr or "") + "\n" + (r.stdout or "")
+            _sched_log(f"✗ predict failed (rc={r.returncode})")
+            for line in err_combined.strip().split("\n")[-10:]:
+                if line.strip():
+                    _sched_log(f"    {line}")
     except subprocess.TimeoutExpired:
         _sched_log("✗ predict timeout 120s")
     except Exception as e:

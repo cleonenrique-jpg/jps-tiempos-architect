@@ -39,6 +39,7 @@ from datetime import datetime
 from typing import List, Tuple
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.environ.get("JPS_DATA_DIR", HERE)
 HISTORICAL = "historical_data.json"
 
 
@@ -461,7 +462,7 @@ def maurers_universal(bits: List[int], L: int = 7, Q: int = 1280) -> dict:
 # ────────────────────────────────────────────────────────────────────
 
 def load_chronological() -> List[int]:
-    with open(os.path.join(HERE, HISTORICAL), "r", encoding="utf-8") as f:
+    with open(os.path.join(DATA_DIR, HISTORICAL), "r", encoding="utf-8") as f:
         data = json.load(f)
     sequence = []
     sorted_days = sorted(data, key=lambda d: (d.get("dia", "")))
@@ -485,7 +486,7 @@ def main():
     print("║   NIST SP 800-22 Statistical Test Suite                          ║")
     print("╚══════════════════════════════════════════════════════════════════╝")
 
-    if not os.path.exists(os.path.join(HERE, HISTORICAL)):
+    if not os.path.exists(os.path.join(DATA_DIR, HISTORICAL)):
         print(f"\n  ⚠ No existe {HISTORICAL}. Corré fetch primero.")
         return
 
@@ -568,7 +569,7 @@ def main():
         "n_rejected": rejected,
         "n_accepted": accepted,
     }
-    with open(os.path.join(HERE, "nist_sts_report.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(DATA_DIR, "nist_sts_report.json"), "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, ensure_ascii=False, default=str)
     print(f"\n  ✓ Reporte completo: nist_sts_report.json\n")
 

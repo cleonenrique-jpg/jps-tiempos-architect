@@ -35,6 +35,9 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.environ.get("JPS_DATA_DIR", HERE)
+if DATA_DIR != HERE and not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR, exist_ok=True)
 STATE_FILE = "bandit_state.json"
 PREDICTIONS_LOG = "predictions_log.jsonl"
 HISTORICAL = "historical_data.json"
@@ -67,7 +70,7 @@ ALL_STRATEGIES = [
 
 
 def _state_path() -> str:
-    return os.path.join(HERE, STATE_FILE)
+    return os.path.join(DATA_DIR, STATE_FILE)
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -205,7 +208,7 @@ def _load_jsonl(path: str) -> List[dict]:
 
 
 def _build_winners_index() -> Dict[str, dict]:
-    p = os.path.join(HERE, HISTORICAL)
+    p = os.path.join(DATA_DIR, HISTORICAL)
     if not os.path.exists(p):
         return {}
     with open(p, "r", encoding="utf-8") as f:
@@ -259,7 +262,7 @@ def bootstrap_from_backtest(state: BanditState, verbose: bool = True) -> dict:
         }
     state.data["history"] = []
 
-    sessions_path = os.path.join(HERE, "backtest_sessions.json")
+    sessions_path = os.path.join(DATA_DIR, "backtest_sessions.json")
     if not os.path.exists(sessions_path):
         if verbose:
             print(f"  ⚠ No existe backtest_sessions.json — corré primero `python3 jps_backtest.py`")
@@ -315,7 +318,7 @@ def bootstrap_from_history(state: BanditState, verbose: bool = True) -> int:
         }
     state.data["history"] = []
 
-    records = _load_jsonl(os.path.join(HERE, PREDICTIONS_LOG))
+    records = _load_jsonl(os.path.join(DATA_DIR, PREDICTIONS_LOG))
     latest = _merge_latest(records)
     winners = _build_winners_index()
 

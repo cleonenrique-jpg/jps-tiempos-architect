@@ -42,6 +42,11 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 PORT     = int(sys.argv[1]) if len(sys.argv) > 1 else 7788
 JPS_BASE = "https://integration.jps.go.cr"
 HERE     = os.path.dirname(os.path.abspath(__file__))
+# DATA_DIR: dónde viven los datos persistentes. En Railway será /data (volume).
+# Default a HERE para correr local sin cambios.
+DATA_DIR = os.environ.get("JPS_DATA_DIR", HERE)
+if DATA_DIR != HERE and not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR, exist_ok=True)
 
 # In-memory state (persists while server runs)
 STATE = {
@@ -425,8 +430,31 @@ def pipeline(params):
 CORS = {
     "Access-Control-Allow-Origin":  "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
 }
+
+# Basic Auth opcional via env vars. Si BOTH están seteadas, se requiere auth.
+# Si AMBAS están vacías, el server queda abierto (modo local).
+BASIC_AUTH_USER = os.environ.get("BASIC_AUTH_USER", "").strip()
+BASIC_AUTH_PASS = os.environ.get("BASIC_AUTH_PASS", "").strip()
+BASIC_AUTH_ENABLED = bool(BASIC_AUTH_USER and BASIC_AUTH_PASS)
+
+
+def _check_basic_auth(headers) -> bool:
+    """Devuelve True si está autenticado o auth está desactivado."""
+    if not BASIC_AUTH_ENABLED:
+        return True
+    import base64
+    auth_header = headers.get("Authorization", "")
+    if not auth_header.startswith("Basic "):
+        return False
+    try:
+        encoded = auth_header.split(" ", 1)[1].strip()
+        decoded = base64.b64decode(encoded).decode("utf-8")
+        user, _, pw = decoded.partition(":")
+        return user == BASIC_AUTH_USER and pw == BASIC_AUTH_PASS
+    except Exception:
+        return False
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -472,6 +500,8 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        if not self._require_auth():
+            return
         parsed = urllib.parse.urlparse(self.path)
         try:
             length = int(self.headers.get("Content-Length", 0) or 0)
@@ -495,7 +525,7 @@ class Handler(BaseHTTPRequestHandler):
                     "actual_bet_per_ticket": bet_per_ticket,
                     "committed_at": datetime.now().isoformat(),
                 }
-                with open(os.path.join(HERE, "predictions_log.jsonl"), "a", encoding="utf-8") as f:
+                with open(os.path.join(DATA_DIR, "predictions_log.jsonl"), "a", encoding="utf-8") as f:
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
                 self.send_json({"ok": True, "record": record})
 
@@ -510,7 +540,7 @@ class Handler(BaseHTTPRequestHandler):
                     "status": "skipped",
                     "skipped_at": datetime.now().isoformat(),
                 }
-                with open(os.path.join(HERE, "predictions_log.jsonl"), "a", encoding="utf-8") as f:
+                with open(os.path.join(DATA_DIR, "predictions_log.jsonl"), "a", encoding="utf-8") as f:
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
                 self.send_json({"ok": True, "record": record})
 
@@ -521,7 +551,26 @@ class Handler(BaseHTTPRequestHandler):
             import traceback
             self.send_json({"error": str(e), "trace": traceback.format_exc()[-1500:]}, 500)
 
+    def _require_auth(self) -> bool:
+        """Si auth está enabled y falla, manda 401 y devuelve False. True si OK."""
+        if _check_basic_auth(self.headers):
+            return True
+        body = b'{"error": "authentication required"}'
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", 'Basic realm="JPS Tiempos Lab"')
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        for k, v in CORS.items():
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(body)
+        return False
+
     def do_GET(self):
+        # Permitir healthcheck SIN auth (necesario para Railway healthchecks)
+        parsed_pre = urllib.parse.urlparse(self.path)
+        if parsed_pre.path != "/api/status" and not self._require_auth():
+            return
         parsed = urllib.parse.urlparse(self.path)
         params = dict(urllib.parse.parse_qsl(parsed.query))
         try:
@@ -552,22 +601,22 @@ class Handler(BaseHTTPRequestHandler):
 
             elif parsed.path == "/predictions_log.jsonl":
                 # Sirve el JSONL para que dashboard.html lo lea con fetch()
-                p = os.path.join(HERE, "predictions_log.jsonl")
+                p = os.path.join(DATA_DIR, "predictions_log.jsonl")
                 if os.path.exists(p):
                     self.send_file(p, "application/x-ndjson; charset=utf-8")
                 else:
                     self.send_file(p, "text/plain")  # 404 via send_file
 
             elif parsed.path == "/backtest_report.json":
-                p = os.path.join(HERE, "backtest_report.json")
+                p = os.path.join(DATA_DIR, "backtest_report.json")
                 self.send_file(p, "application/json; charset=utf-8")
 
             elif parsed.path == "/historical_data.json":
-                p = os.path.join(HERE, "historical_data.json")
+                p = os.path.join(DATA_DIR, "historical_data.json")
                 self.send_file(p, "application/json; charset=utf-8")
 
             elif parsed.path == "/bandit_state.json":
-                p = os.path.join(HERE, "bandit_state.json")
+                p = os.path.join(DATA_DIR, "bandit_state.json")
                 self.send_file(p, "application/json; charset=utf-8")
 
             elif parsed.path == "/api/status":
@@ -1553,10 +1602,14 @@ def _run_predict_sched(args):
 
 
 def _run_fetch_reconcile_sched():
-    _sched_log("→ fetch --mode history --days 7 + reconcile")
+    # CRÍTICO: usar --days 180 porque fetch SOBREESCRIBE historical_data.json
+    # (no es acumulativo). Si usamos --days 7, perdemos 173 días de histórico
+    # cada vez. Eso rompe estrategias que necesitan mucha data (weekday_specific
+    # necesita ≥30 sorteos por weekday = ≥210 sorteos total).
+    _sched_log("→ fetch --mode history --days 180 + reconcile")
     try:
         r1 = subprocess.run(
-            [sys.executable, os.path.join(HERE, "jps_edge_tool.py"), "fetch", "--mode", "history", "--days", "7"],
+            [sys.executable, os.path.join(HERE, "jps_edge_tool.py"), "fetch", "--mode", "history", "--days", "180"],
             cwd=HERE, capture_output=True, text=True, timeout=120,
         )
         if r1.returncode != 0:

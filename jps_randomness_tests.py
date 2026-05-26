@@ -38,6 +38,7 @@ from datetime import datetime
 from typing import List, Tuple
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.environ.get("JPS_DATA_DIR", HERE)
 HISTORICAL = "historical_data.json"
 
 # ════════════════════════════════════════════════════════════════════
@@ -46,7 +47,7 @@ HISTORICAL = "historical_data.json"
 
 def load_chronological() -> List[int]:
     """Devuelve los exactos en orden cronológico (mañana, mediaTarde, tarde)."""
-    with open(os.path.join(HERE, HISTORICAL), "r", encoding="utf-8") as f:
+    with open(os.path.join(DATA_DIR, HISTORICAL), "r", encoding="utf-8") as f:
         data = json.load(f)
     sequence = []
     session_order = {"manana": 1, "mediaTarde": 2, "tarde": 3}
@@ -413,7 +414,7 @@ def main():
     print("║   JPS TIEMPOS LAB — Tests de Aleatoriedad Rigurosos              ║")
     print("╚══════════════════════════════════════════════════════════════════╝")
 
-    if not os.path.exists(os.path.join(HERE, HISTORICAL)):
+    if not os.path.exists(os.path.join(DATA_DIR, HISTORICAL)):
         print(f"\n  ⚠ No existe {HISTORICAL}. Corré: python3 jps_edge_tool.py fetch --mode history --days 180")
         return
 
@@ -502,7 +503,7 @@ def main():
         "n_rejected": rejected,
         "n_accepted": accepted,
     }
-    out_path = os.path.join(HERE, "randomness_tests_report.json")
+    out_path = os.path.join(DATA_DIR, "randomness_tests_report.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, ensure_ascii=False, default=str)
     print(f"  ✓ Reporte completo guardado en: randomness_tests_report.json\n")

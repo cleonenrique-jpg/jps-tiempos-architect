@@ -36,6 +36,7 @@ from datetime import datetime
 from typing import List, Tuple
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.environ.get("JPS_DATA_DIR", HERE)
 HISTORICAL = "historical_data.json"
 
 # ────────────────────────────────────────────────────────────────────
@@ -53,7 +54,7 @@ def chi2_sf(x: float, df: int) -> float:
 
 
 def load_chronological() -> List[int]:
-    with open(os.path.join(HERE, HISTORICAL), "r", encoding="utf-8") as f:
+    with open(os.path.join(DATA_DIR, HISTORICAL), "r", encoding="utf-8") as f:
         data = json.load(f)
     sequence = []
     sorted_days = sorted(data, key=lambda d: (d.get("dia", "")))
@@ -398,7 +399,7 @@ def main():
     print("║   DIEHARD Battery (Marsaglia) — versiones adaptadas a 0-99       ║")
     print("╚══════════════════════════════════════════════════════════════════╝")
 
-    if not os.path.exists(os.path.join(HERE, HISTORICAL)):
+    if not os.path.exists(os.path.join(DATA_DIR, HISTORICAL)):
         print(f"\n  ⚠ No existe {HISTORICAL}.")
         return
 
@@ -475,7 +476,7 @@ def main():
         "n_rejected": rejected,
         "n_accepted": accepted,
     }
-    with open(os.path.join(HERE, "diehard_report.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(DATA_DIR, "diehard_report.json"), "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, ensure_ascii=False, default=str)
     print(f"\n  ✓ Reporte: diehard_report.json\n")
 

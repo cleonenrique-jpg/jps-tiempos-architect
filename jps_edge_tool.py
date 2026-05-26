@@ -46,9 +46,21 @@ SEED_DEFAULT = 42
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+# DATA_DIR: dónde viven los archivos de datos (JSONL, JSON, reports).
+# Local: mismo dir que el código (HERE). Railway/container: /data (env var).
+# Esto permite que el código corra IDÉNTICO local y en deploy persistente.
+DATA_DIR = os.environ.get("JPS_DATA_DIR", HERE)
+if DATA_DIR != HERE and not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR, exist_ok=True)
+
 
 def path(filename: str) -> str:
-    return os.path.join(HERE, filename)
+    """Resuelve la ruta de un archivo de DATOS.
+
+    Si JPS_DATA_DIR está configurada (Railway), usa ese directorio.
+    Si no, usa el directorio del código (modo local clásico).
+    """
+    return os.path.join(DATA_DIR, filename)
 
 
 def save_json(data: dict, filename: str):
